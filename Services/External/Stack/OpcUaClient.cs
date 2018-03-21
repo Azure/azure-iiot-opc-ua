@@ -110,7 +110,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.Services.External.Stack {
                 else {
                     // Create new session
                     try {
-                        session = await CreateSessionAsync(key).ConfigureAwait(false); ;
+                        session = await CreateSessionAsync(key).ConfigureAwait(false);
                     }
                     catch(ServiceResultException sre) {
                         _logger.Debug("Failed create session", () => new { sre, endpoint });
@@ -120,7 +120,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.Services.External.Stack {
                 }
                 try {
                     // Run service on session and convert
-                    var result = await service(session.Session).ConfigureAwait(false); ;
+                    var result = await service(session.Session).ConfigureAwait(false); 
                     ReturnSession(session);
                     return result;
                 }

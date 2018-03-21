@@ -230,7 +230,7 @@ Operations (Mutually exclusive):
             var addresses = await Dns.GetHostAddressesAsync(host);
             var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             var watch = Stopwatch.StartNew();
-            var results = await PortScanner.ScanAsync(logger,
+            var results = await PortScanner.ScanAsync(logger, 
                 PortRange.All.
                     SelectMany(r => r.GetEndpoints(addresses.First())), cts.Token);
             foreach(var result in results) {

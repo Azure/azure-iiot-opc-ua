@@ -292,10 +292,13 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             // Set up scanner pipeline and start discovery
             //
             var local = options.Mode == DiscoveryMode.Local;
-            using (var portscan = new PortScanner(_logger, portranges, discovery, ct))
-            using (var netscanner = new NetworkScanner(_logger, portranges,
-                local, local ? null : options.AddressRanges, NetworkClass.Wired, ct)) {
-                await discovery.Completion;
+            using (var portscan = new PortScanner(_logger, portranges, discovery, ct) {
+                PortProbe = new OpcUaServerProbe(_logger)
+            }) {
+                using (var netscanner = new NetworkScanner(_logger, portranges, local, 
+                    local ? null : options.AddressRanges, NetworkClass.Wired, ct)) {
+                    await discovery.Completion;
+                }
             }
             ct.ThrowIfCancellationRequested();
             _logger.Info($"Discovery took {watch.Elapsed} and found {discovered.Count} " +
