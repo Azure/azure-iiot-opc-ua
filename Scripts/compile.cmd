@@ -1,11 +1,11 @@
 @ECHO off & setlocal enableextensions enabledelayedexpansion
 
 :: Usage:
-:: Compile the project in the local environment:  scripts\compile
-:: Compile the project inside a Docker container: scripts\compile -s
-:: Compile the project inside a Docker container: scripts\compile --in-sandbox
+:: Compile the project in the local environment:  Scripts\compile
+:: Compile the project inside a Docker container: Scripts\compile -s
+:: Compile the project inside a Docker container: Scripts\compile --in-sandbox
 
-:: strlen("\scripts\") => 9
+:: strlen("\Scripts\") => 9
 SET APP_HOME=%~dp0
 SET APP_HOME=%APP_HOME:~0,-9%
 cd %APP_HOME%
@@ -55,9 +55,9 @@ IF "%1"=="--in-sandbox" GOTO :RunInSandbox
         -v %PCS_CACHE%\sandbox\.dotnet:/root/.dotnet ^
         -v %PCS_CACHE%\sandbox\.nuget:/root/.nuget ^
         -v %APP_HOME%:/opt/code ^
-        azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/scripts/compile
+        azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/code/Scripts/compile
 
-    :: Error 125 typically triggers on Windows if the drive is not shared
+    :: Error 125 typically triggers in Windows if the drive is not shared
     IF %ERRORLEVEL% EQU 125 GOTO DOCKER_SHARE
     IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
@@ -69,19 +69,19 @@ goto :END
 
 :MISSING_DOTNET
     echo ERROR: 'dotnet' command not found.
-    echo Install .NET Core 1.1.2 and make sure the 'dotnet' command is in the PATH.
+    echo Install .NET Core 2 and make sure the 'dotnet' command is in the PATH.
     echo Nuget installation: https://dotnet.github.io
-    exit /B 1
-
-:DOCKER_SHARE
-    echo ERROR: the drive containing the source code cannot be mounted.
-    echo Open Docker settings from the tray icon, and fix the settings under 'Shared Drives'.
     exit /B 1
 
 :MISSING_DOCKER
     echo ERROR: 'docker' command not found.
     echo Install Docker and make sure the 'docker' command is in the PATH.
     echo Docker installation: https://www.docker.com/community-edition#/download
+    exit /B 1
+
+:DOCKER_SHARE
+    echo ERROR: the drive containing the source code cannot be mounted.
+    echo Open Docker settings from the tray icon, and fix the settings under 'Shared Drives'.
     exit /B 1
 
 :FAIL

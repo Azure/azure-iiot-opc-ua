@@ -1,12 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -e
 
-set -e
 APP_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )/"
-source "$APP_HOME/scripts/.functions.sh"
+source "$APP_HOME/Scripts/.functions.sh"
 
 if [[ ${#APP_HOME} -lt 20 ]]; then
     error "Unable to detect current folder. Aborting."
-    exit 1
+    exit -1
 fi
 
 cleanup_tmp_files() {

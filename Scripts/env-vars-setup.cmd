@@ -7,12 +7,10 @@
 ::
 
 :: see: Shared access policies => key name => Connection string
-SETX PCS_IOTHUB_CONNSTRING "..."
+SETX _HUB_CS "..."
 
-SETX PCS_IOTHUBMANAGER_WEBSERVICE_URL "..."
+:: see: Event hub compatible connection string
+SETX _EH_CS "..."
 
-:: The OpenId tokens issuer URL, e.g. https://sts.windows.net/12000000-3400-5600-0000-780000000000/
-SETX PCS_AUTH_ISSUER "{enter the token issuer URL here}"
-
-:: The intended audience of the tokens, e.g. your Client Id
-SETX PCS_AUTH_AUDIENCE "{enter the tokens audience here}"
+:: see: Storage access keys
+SETX _STORE_CS "..."

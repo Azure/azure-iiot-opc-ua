@@ -1,23 +1,11 @@
-#!/usr/bin/env bash -e
+echo "Starting at https://localhost:10443"
+echo
+echo "Note:"
+echo " * When running locally, the service might run with an invalid SSL cert"
+echo " * The service requires some configuration files hosted under /app"
+echo "   Edit docker-compose.yml to use a different path"
+echo
 
-# Note: use lowercase names for the Docker images
-DOCKER_IMAGE="microsoft/iot-opc-twin-service"
+read -t 10 -p "Press ENTER to start or wait ten seconds for the services to start..."
 
-APP_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && cd .. && pwd )/"
-source "$APP_HOME/scripts/.functions.sh"
-
-run_container() {
-    check_dependency_docker
-
-    $APP_HOME/scripts/env-vars-check
-
-	echo "Starting OPC Twin ..."
-	docker run -it -p 9002:9002 \
-        -e PCS_IOTHUB_CONNSTRING \
-        -e PCS_CONFIG_WEBSERVICE_URL \
-        -e PCS_AUTH_ISSUER \
-        -e PCS_AUTH_AUDIENCE \
-        "$DOCKER_IMAGE:testing"
-}
-
-run_container
+docker-compose up

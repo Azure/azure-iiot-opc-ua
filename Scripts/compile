@@ -1,13 +1,12 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -e
 
 # Usage:
-# Compile the project in the local environment:  ./scripts/compile
-# Compile the project inside a Docker container: ./scripts/compile -s
-# Compile the project inside a Docker container: ./scripts/compile --in-sandbox
+# Compile the project in the local environment:  ./Scripts/compile
+# Compile the project inside a Docker container: ./Scripts/compile -s
+# Compile the project inside a Docker container: ./Scripts/compile --in-sandbox
 
-set -e
 APP_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )/"
-source "$APP_HOME/scripts/.functions.sh"
+source "$APP_HOME/Scripts/.functions.sh"
 
 # Folder where PCS sandboxes cache data. Reuse the same folder to speed up the
 # sandbox and to save disk space.
@@ -49,11 +48,11 @@ compile_in_sandbox() {
             -v "$PCS_CACHE/sandbox/.dotnet:/root/.dotnet" \
             -v "$PCS_CACHE/sandbox/.nuget:/root/.nuget" \
             -v "$APP_HOME:/opt/code" \
-            azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/scripts/compile
+            azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/code/Scripts/compile
     else
         # Note 'winpty' is required to provide a TTY to Docker
         echo "Launching cmd.exe /c winpty ..."
-        cmd.exe /c "winpty .\scripts\compile.cmd" --in-sandbox
+        cmd.exe /c "winpty .\Scripts\compile.cmd --in-sandbox"
     fi
 }
 

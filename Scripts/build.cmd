@@ -1,14 +1,14 @@
 @ECHO off & setlocal enableextensions enabledelayedexpansion
 
 :: Usage:
-:: Build the project in the local environment:  scripts\build
-:: Build the project inside a Docker container: scripts\build -s
-:: Build the project inside a Docker container: scripts\build --in-sandbox
+:: Build the project in the local environment:  Scripts\build
+:: Build the project inside a Docker container: Scripts\build -s
+:: Build the project inside a Docker container: Scripts\build --in-sandbox
 
 :: Debug|Release
 SET CONFIGURATION=Release
 
-:: strlen("\scripts\") => 9
+:: strlen("\Scripts\") => 9
 SET APP_HOME=%~dp0
 SET APP_HOME=%APP_HOME:~0,-9%
 cd %APP_HOME%
@@ -24,7 +24,7 @@ IF "%1"=="--in-sandbox" GOTO :RunInSandbox
     IF %ERRORLEVEL% NEQ 0 GOTO MISSING_DOTNET
 
     :: Check settings
-    call .\scripts\env-vars-check.cmd
+    call .\Scripts\env-vars-check.cmd
     IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
     :: Restore nuget packages and compile the application
@@ -64,17 +64,16 @@ IF "%1"=="--in-sandbox" GOTO :RunInSandbox
 
     :: Start the sandbox and execute the build script
     docker run ^
-        -e "PCS_IOTHUB_CONNSTRING=%PCS_IOTHUB_CONNSTRING%" ^
-        -e "PCS_IOTHUBMANAGER_WEBSERVICE_URL=%PCS_IOTHUBMANAGER_WEBSERVICE_URL%" ^
-        -e "PCS_AUTH_ISSUER=%PCS_AUTH_ISSUER%" ^
-        -e "PCS_AUTH_AUDIENCE=%PCS_AUTH_AUDIENCE%" ^
+        -e "_HUB_CS=%_HUB_CS%" ^
+        -e "_STORE_CS=%_STORE_CS%" ^
+        -e "_EH_CS=%_EH_CS%" ^
         -v %PCS_CACHE%\sandbox\.config:/root/.config ^
         -v %PCS_CACHE%\sandbox\.dotnet:/root/.dotnet ^
         -v %PCS_CACHE%\sandbox\.nuget:/root/.nuget ^
         -v %APP_HOME%:/opt/code ^
-        azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/scripts/build
+        azureiotpcs/code-builder-dotnet:1.0-dotnetcore /opt/code/Scripts/build
 
-    :: Error 125 typically triggers on Windows if the drive is not shared
+    :: Error 125 typically triggers in Windows if the drive is not shared
     IF %ERRORLEVEL% EQU 125 GOTO DOCKER_SHARE
     IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
@@ -86,19 +85,19 @@ goto :END
 
 :MISSING_DOTNET
     echo ERROR: 'dotnet' command not found.
-    echo Install .NET Core 1.1.2 and make sure the 'dotnet' command is in the PATH.
+    echo Install .NET Core 2 and make sure the 'dotnet' command is in the PATH.
     echo Nuget installation: https://dotnet.github.io/
-    exit /B 1
-
-:DOCKER_SHARE
-    echo ERROR: the drive containing the source code cannot be mounted.
-    echo Open Docker settings from the tray icon, and fix the settings under 'Shared Drives'.
     exit /B 1
 
 :MISSING_DOCKER
     echo ERROR: 'docker' command not found.
     echo Install Docker and make sure the 'docker' command is in the PATH.
     echo Docker installation: https://www.docker.com/community-edition#/download
+    exit /B 1
+
+:DOCKER_SHARE
+    echo ERROR: the drive containing the source code cannot be mounted.
+    echo Open Docker settings from the tray icon, and fix the settings under 'Shared Drives'.
     exit /B 1
 
 :FAIL
