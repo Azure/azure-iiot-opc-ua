@@ -9,177 +9,218 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
     using Opc.Ua.Bindings;
     using System;
     using System.IO;
-    using System.Net;
     using System.Net.Sockets;
     using System.Text;
-    using System.Threading;
-    using System.Threading.Tasks;
 
     public class OpcUaServerProbe : IPortProbe {
 
         /// <summary>
-        /// Create opc ua server probe
+        /// Create factory
         /// </summary>
         /// <param name="logger"></param>
         public OpcUaServerProbe(ILogger logger) {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _buffer = new byte[160];
-            _messageContext = new ServiceMessageContext {
-                Factory = new EncodeableFactory(),
-                NamespaceUris = new NamespaceTable(),
-                ServerUris = new StringTable(),
-            };
+            _logger = logger;
         }
 
         /// <summary>
-        /// Manage probe
+        /// Create probe
         /// </summary>
-        /// <param name="arg"></param>
-        /// <param name="ok"></param>
-        /// <returns>true if completed, false to be called again</returns>
-        public bool OnProbe(SocketAsyncEventArgs arg, out bool ok) {
-            ok = false;
-            if (arg.SocketError != SocketError.Success) {
-                return true;
-            }
-            if (arg.ConnectSocket == null) {
-                return true;
+        /// <returns></returns>
+        public IAsyncProbe Create() => new OpcUaServerAsyncProbe(_logger);
+
+        /// <summary>
+        /// Async probe that sends a hello and validates the returned ack.
+        /// </summary>
+        private class OpcUaServerAsyncProbe : IAsyncProbe {
+
+            /// <summary>
+            /// Create opc ua server probe
+            /// </summary>
+            /// <param name="logger"></param>
+            public OpcUaServerAsyncProbe(ILogger logger) {
+                _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+                _buffer = new byte[160];
+                _messageContext = new ServiceMessageContext {
+                    Factory = new EncodeableFactory(),
+                    NamespaceUris = new NamespaceTable(),
+                    ServerUris = new StringTable(),
+                };
             }
 
-            switch(_state) {
-                case State.Begin:
-                    // Begin
-                    _socket = arg.ConnectSocket;
-                    _logger.Debug($"Testing {_socket.RemoteEndPoint} ...", () => { });
-                    _size = WriteRequestBuffer(_socket.RemoteEndPoint);
-                    _len = 0;
-                    _state = State.Write;
-                    return OnProbe(arg, out ok);
-                case State.Write:
-                    // Send 
-                    arg.SetBuffer(_buffer, _len, _size - _len);
-                    if (!_socket.SendAsync(arg)) {
-                        return OnProbe(arg, out ok);
+            /// <summary>
+            /// Reset probe
+            /// </summary>
+            public void Reset() {
+                if (_socket != null) {
+                    _socket.SafeDispose();
+                    _socket = null;
+                }
+                _state = State.BeginProbe;
+            }
+
+            /// <summary>
+            /// Called whenever socket operation completes
+            /// </summary>
+            /// <param name="arg"></param>
+            /// <param name="ok"></param>
+            /// <returns>true if completed, false to be called again</returns>
+            public bool Complete(SocketAsyncEventArgs arg, out bool ok) {
+                ok = false;
+                if (arg.SocketError != SocketError.Success) {
+#if LOG_VERBOSE
+                    _logger.Debug($"{_socket.RemoteEndPoint} is no opc server.",
+                        () => arg.SocketError);
+#endif
+                    _state = State.BeginProbe;
+                    return true;
+                }
+                while (true) {
+                    switch (_state) {
+                        case State.BeginProbe:
+                            if (arg.ConnectSocket == null) {
+                                _logger.Debug("Probe called without connected socket!", () => { });
+                                return true;
+                            }
+                            _socket = arg.ConnectSocket;
+#if TRACE
+                            _logger.Debug($"Probe {_socket.RemoteEndPoint} ...", () => { });
+#endif
+                            using (var ostrm = new MemoryStream(_buffer, 0, _buffer.Length))
+                            using (var encoder = new BinaryEncoder(ostrm, _messageContext)) {
+                                encoder.WriteUInt32(null, TcpMessageType.Hello);
+                                encoder.WriteUInt32(null, 0);
+                                encoder.WriteUInt32(null, 0); // ProtocolVersion
+                                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
+                                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
+                                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
+                                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
+                                encoder.WriteByteString(null,
+                                    Encoding.UTF8.GetBytes("opc.tcp://" + _socket.RemoteEndPoint));
+                                _size = encoder.Close();
+                            }
+                            _buffer[4] = (byte)((_size & 0x000000FF));
+                            _buffer[5] = (byte)((_size & 0x0000FF00) >> 8);
+                            _buffer[6] = (byte)((_size & 0x00FF0000) >> 16);
+                            _buffer[7] = (byte)((_size & 0xFF000000) >> 24);
+                            arg.SetBuffer(_buffer, 0, _size);
+                            _len = 0;
+                            _state = State.SendMessage;
+                            if (!_socket.SendAsync(arg)) {
+                                break;
+                            }
+                            return false;
+                        case State.SendMessage:
+                            _len += arg.Count;
+                            if (_len == _size) {
+                                _len = 0;
+                                _size = TcpMessageLimits.MessageTypeAndSize;
+                                _state = State.ReceiveSize;
+                                arg.SetBuffer(0, _size);
+                                // Start read size
+                                if (!_socket.ReceiveAsync(arg)) {
+                                    break;
+                                }
+                                return false;
+                            }
+                            // Continue to send reset
+                            arg.SetBuffer(_len, _size - _len);
+                            if (!_socket.SendAsync(arg)) {
+                                break;
+                            }
+                            return false;
+                        case State.ReceiveSize:
+                            _len += arg.Count;
+                            if (_len == _size) {
+                                var type = BitConverter.ToUInt32(_buffer, 0);
+                                if (type != TcpMessageType.Acknowledge) {
+#if LOG_VERBOSE
+                                    _logger.Debug($"{_socket.RemoteEndPoint} returned invalid " +
+                                        $"message type {type}.", () => {});
+#endif
+                                    _state = State.BeginProbe;
+                                    return true;
+                                }
+                                _size = (int)BitConverter.ToUInt32(_buffer, 4);
+                                if (_size > _buffer.Length) {
+#if TRACE
+                                    _logger.Debug($"{_socket.RemoteEndPoint} returned invalid " +
+                                        $"message length {_size}.", () => { });
+#endif
+                                    _state = State.BeginProbe;
+                                    return true;
+                                }
+                                _len = 0;
+                                // Start receive message
+                                _state = State.ReceiveBuffer;
+                            }
+                            // Continue to read rest of type and size
+                            arg.SetBuffer(_len, _size - _len);
+                            if (!_socket.ReceiveAsync(arg)) {
+                                break;
+                            }
+                            return false;
+                        case State.ReceiveBuffer:
+                            _len += arg.Count;
+                            if (_len == _size) {
+                                _state = State.BeginProbe;
+                                // Validate message
+                                using (var istrm = new MemoryStream(_buffer, 0, _size))
+                                using (var decoder = new BinaryDecoder(istrm, _messageContext)) {
+                                    var protocolVersion = decoder.ReadUInt32(null);
+                                    var sendBufferSize = (int)decoder.ReadUInt32(null);
+                                    var receiveBufferSize = (int)decoder.ReadUInt32(null);
+                                    var maxMessageSize = (int)decoder.ReadUInt32(null);
+                                    var maxChunkCount = (int)decoder.ReadUInt32(null);
+
+                                    _logger.Debug($"Found opc server (ver: {protocolVersion}) " +
+                                        $"at {_socket.RemoteEndPoint}...", () => { });
+
+                                    if (sendBufferSize < TcpMessageLimits.MinBufferSize ||
+                                        receiveBufferSize < TcpMessageLimits.MinBufferSize) {
+                                        _logger.Debug($"Bad size value read {sendBufferSize} " +
+                                            $"or {receiveBufferSize} from opc server " +
+                                            $"at {_socket.RemoteEndPoint}.", () => { });
+                                        return true;
+                                    }
+                                }
+                                ok = true;
+                                return true;
+                            }
+                            // Continue to read rest
+                            arg.SetBuffer(_len, _size - _len);
+                            if (!_socket.ReceiveAsync(arg)) {
+                                break;
+                            }
+                            return false;
+                        default:
+                            throw new SystemException("Bad state");
                     }
-                    return false;
-                case State.ReadSize:
-                case State.Read:
-                case State.Validate:
-                    return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Sends a Hello message and validates response.
-        /// </summary>
-        /// <param name="socket"></param>
-        /// <returns></returns>
-        public async Task<bool> IsValidAsync(Socket socket, CancellationToken ct) {
-            _logger.Debug($"Testing {socket.RemoteEndPoint} ...", () => { });
-            var size = WriteRequestBuffer(socket.RemoteEndPoint);
-            try {
-                for (var len = 0; len != size;) {
-                    // Write message
-                    len += await socket.SendAsync(
-                        new ArraySegment<byte>(_buffer, len, size - len), SocketFlags.None);
-                    ct.ThrowIfCancellationRequested();
-                }
-                size = TcpMessageLimits.MessageTypeAndSize;
-                for (var len = 0; len != size;) {
-                    // Read type and size first
-                    len += await socket.ReceiveAsync(
-                        new ArraySegment<byte>(_buffer, len, size - len), SocketFlags.None);
-                    ct.ThrowIfCancellationRequested();
-                }
-                var type = BitConverter.ToUInt32(_buffer, 0);
-                if (type != TcpMessageType.Acknowledge) {
-                    return false;
-                }
-                size = (int)BitConverter.ToUInt32(_buffer, 4);
-                if (size > _buffer.Length) {
-                    return false;
-                }
-                for (var len = 0; len != size;) {
-                    // Read message
-                    len += await socket.ReceiveAsync(
-                        new ArraySegment<byte>(_buffer, len, size - len), SocketFlags.None);
-                    ct.ThrowIfCancellationRequested();
-                }
-                return ValidateResponseBuffer(size);
-            }
-            catch {
-                _logger.Debug($"{socket.RemoteEndPoint} is no opc server.", () => { });
-                return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Write hello request buffer
-        /// </summary>
-        /// <param name="remoteEndpoint"></param>
-        /// <returns></returns>
-        private int WriteRequestBuffer(EndPoint remoteEndpoint) {
-            var size = 0;
-            using (var ostrm = new MemoryStream(_buffer, 0, _buffer.Length))
-            using (var encoder = new BinaryEncoder(ostrm, _messageContext)) {
-                encoder.WriteUInt32(null, TcpMessageType.Hello);
-                encoder.WriteUInt32(null, 0);
-                encoder.WriteUInt32(null, 0); // ProtocolVersion
-                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
-                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
-                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
-                encoder.WriteUInt32(null, TcpMessageLimits.DefaultMaxMessageSize);
-                encoder.WriteByteString(null,
-                    Encoding.UTF8.GetBytes("opc.tcp://" + remoteEndpoint));
-                size = encoder.Close();
-            }
-            _buffer[4] = (byte)((size & 0x000000FF));
-            _buffer[5] = (byte)((size & 0x0000FF00) >> 8);
-            _buffer[6] = (byte)((size & 0x00FF0000) >> 16);
-            _buffer[7] = (byte)((size & 0xFF000000) >> 24);
-            return size;
-        }
-
-        /// <summary>
-        /// Validate ack response buffer
-        /// </summary>
-        /// <param name="size"></param>
-        /// <returns></returns>
-        private bool ValidateResponseBuffer(int size) {
-            using (var istrm = new MemoryStream(_buffer, 0, size))
-            using (var decoder = new BinaryDecoder(istrm, _messageContext)) {
-                var protocolVersion = decoder.ReadUInt32(null);
-                var sendBufferSize = (int)decoder.ReadUInt32(null);
-                var receiveBufferSize = (int)decoder.ReadUInt32(null);
-                var maxMessageSize = (int)decoder.ReadUInt32(null);
-                var maxChunkCount = (int)decoder.ReadUInt32(null);
-
-                if (sendBufferSize < TcpMessageLimits.MinBufferSize ||
-                    receiveBufferSize < TcpMessageLimits.MinBufferSize) {
-                    _logger.Debug($"Bad size value read {sendBufferSize} " +
-                        $"or {receiveBufferSize}.", () => { });
-                    return false;
                 }
             }
-            return true;
+
+            /// <summary>
+            /// Dispose handler
+            /// </summary>
+            public void Dispose() {
+                Reset();
+            }
+
+            private enum State {
+                BeginProbe,
+                SendMessage,
+                ReceiveSize,
+                ReceiveBuffer
+            }
+
+            private State _state;
+            private Socket _socket;
+            private int _len;
+            private int _size;
+            private readonly byte[] _buffer;
+            private readonly ServiceMessageContext _messageContext;
+            private readonly ILogger _logger;
         }
 
-        private enum State {
-            Begin,
-            Write,
-            ReadSize,
-            Read,
-            Validate
-        }
-
-        private State _state;
-        private Socket _socket;
-        private int _len;
-        private int _size;
-        private readonly byte[] _buffer;
-        private readonly ServiceMessageContext _messageContext;
         private readonly ILogger _logger;
     }
 }

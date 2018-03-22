@@ -42,9 +42,16 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         public static int MaxProbeCount { get; set; } = 5000;
 
         /// <summary>
-        /// Custom port probe to use
+        /// Create scanner with default port probe
         /// </summary>
-        public IPortProbe PortProbe { get; set; } = new NullPortProbe();
+        /// <param name="logger"></param>
+        /// <param name="source"></param>
+        /// <param name="target"></param>
+        /// <param name="ct"></param>
+        public PortScanner(ILogger logger, ISourceBlock<IEnumerable<IPEndPoint>> source,
+            ITargetBlock<IPEndPoint> target, CancellationToken ct) :
+            this(logger, source, target, null, ct) {
+        }
 
         /// <summary>
         /// Create scanner
@@ -52,18 +59,20 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         /// <param name="logger"></param>
         /// <param name="source"></param>
         /// <param name="target"></param>
+        /// <param name="portProbe"></param>
         /// <param name="ct"></param>
         public PortScanner(ILogger logger, ISourceBlock<IEnumerable<IPEndPoint>> source,
-            ITargetBlock<IPEndPoint> target, CancellationToken ct) {
+            ITargetBlock<IPEndPoint> target, IPortProbe portProbe, CancellationToken ct) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _source = source ?? throw new ArgumentNullException(nameof(source));
             _target = target ?? throw new ArgumentNullException(nameof(target));
             _candidates = new BlockingCollection<IPEndPoint>(MaxProbeCount * 10);
+            _portProbe = portProbe ?? new NullPortProbe();
             _requeued = new ConcurrentQueue<IPEndPoint>();
             _rand = new Random();
 
-            _probes = EnumerableEx
-                .Repeat(i => new Probe(this, i), MaxProbeCount)
+            _probePool = EnumerableEx
+                .Repeat(i => new ConnectProbe(this, i), MaxProbeCount)
                 .ToList();
 
             _cts = new CancellationTokenSource();
@@ -71,7 +80,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
                 TaskScheduler.Current);
             _active = MaxProbeCount;
-            foreach (var probe in _probes) {
+            foreach (var probe in _probePool) {
                 probe.Start();
             }
             ct.Register(_cts.Cancel);
@@ -87,9 +96,11 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="range"></param>
+        /// <param name="probe"></param>
         /// <param name="ct"></param>
+        /// <returns></returns>
         public static async Task<IEnumerable<IPEndPoint>> ScanAsync(ILogger logger,
-            IEnumerable<IPEndPoint> range, CancellationToken ct) {
+            IEnumerable<IPEndPoint> range, IPortProbe probe, CancellationToken ct) {
             var result = new List<IPEndPoint>();
             var input = new BufferBlock<IEnumerable<IPEndPoint>>();
             input.Post(range);
@@ -100,7 +111,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 logger.Debug($"{ep} open.", () => { });
 #endif
             });
-            using (var scanner = new PortScanner(logger, input, output, ct)) {
+            using (var scanner = new PortScanner(logger, input, output, probe, ct)) {
                 await scanner.Completion;
             }
             return result;
@@ -118,10 +129,10 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             _active = 0;
             _target.Complete();
             // Clean up all probes
-            foreach (var probe in _probes) {
+            foreach (var probe in _probePool) {
                 probe.Dispose();
             }
-            _probes.Clear();
+            _probePool.Clear();
         }
 
         /// <summary>
@@ -167,25 +178,31 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         /// <summary>
         /// Null port probe
         /// </summary>
-        private class NullPortProbe : IPortProbe {
+        private class NullPortProbe : IAsyncProbe, IPortProbe {
 
-            /// <summary>
-            /// Immediatly complete probe and return success
-            /// </summary>
-            /// <param name="arg"></param>
-            /// <param name="ok"></param>
-            /// <returns></returns>
-            public bool OnProbe(SocketAsyncEventArgs arg, out bool ok) {
+            /// <inheritdoc />
+            public bool Complete(SocketAsyncEventArgs arg, out bool ok) {
                 ok = true;
                 return true;
             }
+
+            /// <inheritdoc />
+            public void Dispose() {}
+
+            /// <inheritdoc />
+            public void Reset() {}
+
+            /// <inheritdoc />
+            public IAsyncProbe Create() => this;
         }
 
         /// <summary>
-        /// A probe is a ip endpoint consumer.
+        /// A connect probe is a ip endpoint consumer that tries to connect
+        /// to the consumed ip endpoint.  if successful it uses the probe
+        /// implementation to interrogate the server.
         /// </summary>
         /// <returns></returns>
-        private class Probe : IDisposable {
+        private class ConnectProbe : IDisposable {
 
             /// <summary>
             /// Internal probe state
@@ -203,13 +220,14 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// </summary>
             /// <param name="scanner"></param>
             /// <param name="index"></param>
-            public Probe(PortScanner scanner, int index) {
+            public ConnectProbe(PortScanner scanner, int index) {
                 _index = index;
                 _scanner = scanner;
                 _timer = new Timer(OnTimeout);
                 _lock = new SemaphoreSlim(1);
                 _arg = new SocketAsyncEventArgs();
                 _arg.Completed += OnComplete;
+                _probe = scanner._portProbe.Create();
             }
 
             /// <summary>
@@ -255,8 +273,9 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 _lock.Wait();
                 try {
                     if (!OnCompleteNoLock(arg)) {
-                        return; // Complete asynchronously until true...
+                        return; // assume next OnComplete will occur or timeout...
                     }
+
                     // Cancel timer and start next
                     _timer.Change(Timeout.Infinite, Timeout.Infinite);
                 }
@@ -308,6 +327,8 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                         arg.RemoteEndPoint = ep;
                         while (_state != State.Disposed) {
                             try {
+                                // Reset probe and start connect
+                                _probe.Reset();
                                 _state = State.Connect;
                                 if (!Socket.ConnectAsync(SocketType.Stream, ProtocolType.IP, arg)) {
                                     // Complete inline and pull next...
@@ -401,11 +422,12 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                             // Cancelled, go back to begin
                             _state = State.Begin;
                             return true;
-                        case State.Disposed: 
+                        case State.Disposed:
                             // Stay disposed
                             return true;
+                        default:
+                            throw new SystemException("Unexpected");
                     }
-                    return true;
                 }
                 catch {
                     // Error, continue at beginning
@@ -414,10 +436,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 }
                 finally {
                     if (_state == State.Begin || _state == State.Disposed) {
-                        if (arg.ConnectSocket != null) {
-                            arg.ConnectSocket.Close(0);
-                            arg.ConnectSocket.Dispose();
-                        }
+                        arg.ConnectSocket.SafeDispose();
                         arg.SocketError = SocketError.NotSocket;
                     }
                 }
@@ -429,7 +448,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// <param name="arg"></param>
             /// <returns></returns>
             private bool OnProbeNoLock(SocketAsyncEventArgs arg) {
-                var completed = _scanner.PortProbe.OnProbe(arg, out var ok);
+                var completed = _probe.Complete(arg, out var ok);
                 if (completed) {
                     if (ok) {
                         // Back pressure...
@@ -437,6 +456,10 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                             _scanner._cts.Token).Wait();
                     }
                     _state = State.Begin;
+                }
+                else {
+                    // Wait for completion or timeout after x seconds
+                    _timer.Change(_scanner.ProbeTimeoutInMilliseconds, Timeout.Infinite);
                 }
                 return completed;
             }
@@ -447,21 +470,26 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// <param name="state"></param>
             private void OnTimeout(object state) {
                 var takeLock = _lock.WaitAsync(0);
+                if (!takeLock.IsCompletedSuccessfully) {
+                    // lock is taken
+                    return;
+                }
                 try {
-                    if (!takeLock.IsCompletedSuccessfully) {
-                        // lock is taken
-                        return;
+                    if (_state == State.Connect) {
+                        // Cancel current arg and mark as timedout then recycle
+                        Socket.CancelConnectAsync(_arg);
                     }
-                    // Cancel current arg and mark as timedout then recycle
-                    Socket.CancelConnectAsync(_arg);
+                    _probe.Reset(); // This will also cancel any operation in progress.
                     _arg.SocketError = SocketError.TimedOut;
-                    _state = State.Timeout;
                 }
                 catch (Exception ex) {
                     _scanner._logger.Debug($"Error during timeout of probe {_index}",
                         () => ex);
                 }
-                _lock.Release();
+                finally {
+                    _state = State.Timeout;
+                    _lock.Release();
+                }
             }
 
             private readonly PortScanner _scanner;
@@ -469,18 +497,20 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             private readonly SemaphoreSlim _lock;
             private readonly int _index;
             private readonly Timer _timer;
+            private readonly IAsyncProbe _probe;
             private State _state;
         }
 
         private readonly BlockingCollection<IPEndPoint> _candidates;
         private readonly ConcurrentQueue<IPEndPoint> _requeued;
-        private readonly ILogger _logger;
-        private readonly List<Probe> _probes;
+        private readonly List<ConnectProbe> _probePool;
         private readonly ITargetBlock<IPEndPoint> _target;
         private readonly ISourceBlock<IEnumerable<IPEndPoint>> _source;
         private readonly CancellationTokenSource _cts;
         private readonly Task _producer;
         private readonly Random _rand;
+        private readonly IPortProbe _portProbe;
+        private readonly ILogger _logger;
         private int _active;
     }
 }
