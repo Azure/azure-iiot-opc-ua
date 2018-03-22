@@ -15,6 +15,11 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
     public class OpcUaServerProbe : IPortProbe {
 
         /// <summary>
+        /// Operation timeout
+        /// </summary>
+        public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(1);
+
+        /// <summary>
         /// Create factory
         /// </summary>
         /// <param name="logger"></param>
@@ -26,7 +31,8 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         /// Create probe
         /// </summary>
         /// <returns></returns>
-        public IAsyncProbe Create() => new OpcUaServerAsyncProbe(_logger);
+        public IAsyncProbe Create() =>
+            new OpcUaServerAsyncProbe(_logger, (int)Timeout.TotalMilliseconds);
 
         /// <summary>
         /// Async probe that sends a hello and validates the returned ack.
@@ -37,14 +43,10 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// Create opc ua server probe
             /// </summary>
             /// <param name="logger"></param>
-            public OpcUaServerAsyncProbe(ILogger logger) {
+            public OpcUaServerAsyncProbe(ILogger logger, int timeout) {
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+                _timeout = timeout;
                 _buffer = new byte[160];
-                _messageContext = new ServiceMessageContext {
-                    Factory = new EncodeableFactory(),
-                    NamespaceUris = new NamespaceTable(),
-                    ServerUris = new StringTable(),
-                };
             }
 
             /// <summary>
@@ -64,8 +66,9 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// <param name="arg"></param>
             /// <param name="ok"></param>
             /// <returns>true if completed, false to be called again</returns>
-            public bool Complete(SocketAsyncEventArgs arg, out bool ok) {
+            public bool CompleteAsync(SocketAsyncEventArgs arg, out bool ok, out int timeout) {
                 ok = false;
+                timeout = _timeout;
                 if (arg.SocketError != SocketError.Success) {
 #if LOG_VERBOSE
                     _logger.Debug($"{_socket.RemoteEndPoint} is no opc server.",
@@ -86,7 +89,8 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                             _logger.Debug($"Probe {_socket.RemoteEndPoint} ...", () => { });
 #endif
                             using (var ostrm = new MemoryStream(_buffer, 0, _buffer.Length))
-                            using (var encoder = new BinaryEncoder(ostrm, _messageContext)) {
+                            using (var encoder = new BinaryEncoder(ostrm,
+                                    ServiceMessageContext.GlobalContext)) {
                                 encoder.WriteUInt32(null, TcpMessageType.Hello);
                                 encoder.WriteUInt32(null, 0);
                                 encoder.WriteUInt32(null, 0); // ProtocolVersion
@@ -104,12 +108,12 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                             _buffer[7] = (byte)((_size & 0xFF000000) >> 24);
                             arg.SetBuffer(_buffer, 0, _size);
                             _len = 0;
-                            _state = State.SendMessage;
+                            _state = State.SendHello;
                             if (!_socket.SendAsync(arg)) {
                                 break;
                             }
                             return false;
-                        case State.SendMessage:
+                        case State.SendHello:
                             _len += arg.Count;
                             if (_len == _size) {
                                 _len = 0;
@@ -151,7 +155,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                                 }
                                 _len = 0;
                                 // Start receive message
-                                _state = State.ReceiveBuffer;
+                                _state = State.ReceiveAck;
                             }
                             // Continue to read rest of type and size
                             arg.SetBuffer(_len, _size - _len);
@@ -159,13 +163,14 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                                 break;
                             }
                             return false;
-                        case State.ReceiveBuffer:
+                        case State.ReceiveAck:
                             _len += arg.Count;
                             if (_len == _size) {
                                 _state = State.BeginProbe;
                                 // Validate message
                                 using (var istrm = new MemoryStream(_buffer, 0, _size))
-                                using (var decoder = new BinaryDecoder(istrm, _messageContext)) {
+                                using (var decoder = new BinaryDecoder(istrm,
+                                    ServiceMessageContext.GlobalContext)) {
                                     var protocolVersion = decoder.ReadUInt32(null);
                                     var sendBufferSize = (int)decoder.ReadUInt32(null);
                                     var receiveBufferSize = (int)decoder.ReadUInt32(null);
@@ -207,9 +212,9 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
 
             private enum State {
                 BeginProbe,
-                SendMessage,
+                SendHello,
                 ReceiveSize,
-                ReceiveBuffer
+                ReceiveAck
             }
 
             private State _state;
@@ -217,8 +222,8 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             private int _len;
             private int _size;
             private readonly byte[] _buffer;
-            private readonly ServiceMessageContext _messageContext;
             private readonly ILogger _logger;
+            private readonly int _timeout;
         }
 
         private readonly ILogger _logger;

@@ -10,22 +10,25 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
     public interface IAsyncProbe : IDisposable {
 
         /// <summary>
-        /// Complete probe using the passed in event arg.
+        /// Complete probe using the passed in socket
+        /// event arg.
         /// </summary>
         /// <param name="arg"></param>
         /// <param name="ok">
-        /// If the probe returns true, this value indicates
-        /// whether the port is a valid port.
+        /// If the probe returns true, this value
+        /// indicates whether the port is a valid port.
         /// </param>
+        /// <param name="timeout">Async timeout</param>
         /// <returns>
         /// false if expected to be called again.
         /// true if probe is complete.
         /// </returns>
-        bool Complete(SocketAsyncEventArgs arg, out bool ok);
+        bool CompleteAsync(SocketAsyncEventArgs arg,
+            out bool ok, out int timeout);
 
         /// <summary>
-        /// Reset probe to beginning cancelling any outstanding
-        /// socket operations.
+        /// Reset probe to beginning cancelling any
+        /// outstanding socket operations.
         /// </summary>
         void Reset();
     }

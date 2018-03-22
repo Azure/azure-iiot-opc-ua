@@ -199,6 +199,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 //
                 try {
                     if (!ct.IsCancellationRequested) {
+                        GC.Collect();
                         await Task.Delay(DiscoveryIdleTime ?? TimeSpan.FromMinutes(3), ct);
                     }
                 }

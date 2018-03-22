@@ -181,8 +181,10 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
         private class NullPortProbe : IAsyncProbe, IPortProbe {
 
             /// <inheritdoc />
-            public bool Complete(SocketAsyncEventArgs arg, out bool ok) {
+            public bool CompleteAsync(SocketAsyncEventArgs arg,
+                out bool ok, out int timeout) {
                 ok = true;
+                timeout = 0;
                 return true;
             }
 
@@ -242,6 +244,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                     if (_state != State.Disposed) {
                         _state = State.Disposed;
                         Socket.CancelConnectAsync(_arg);
+                        _probe.Dispose();
                         _arg.Dispose();
                     }
                 }
@@ -390,6 +393,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                     //
                     // and we need to kill this probe and dispose of the underlying argument.
                     //
+                    _probe.Dispose();
                     _arg.Dispose();
                     _state = State.Disposed;
                     _scanner.OnProbeExit();
@@ -448,7 +452,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
             /// <param name="arg"></param>
             /// <returns></returns>
             private bool OnProbeNoLock(SocketAsyncEventArgs arg) {
-                var completed = _probe.Complete(arg, out var ok);
+                var completed = _probe.CompleteAsync(arg, out var ok, out var timeout);
                 if (completed) {
                     if (ok) {
                         // Back pressure...
@@ -459,7 +463,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.EdgeService.Discovery {
                 }
                 else {
                     // Wait for completion or timeout after x seconds
-                    _timer.Change(_scanner.ProbeTimeoutInMilliseconds, Timeout.Infinite);
+                    _timer.Change(timeout, Timeout.Infinite);
                 }
                 return completed;
             }
