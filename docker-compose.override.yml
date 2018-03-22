@@ -10,7 +10,7 @@ services:
     build:
       context: .
       dockerfile: EdgeService/Dockerfile
-    network_mode: "host"
+    #network_mode: "host"
     cap_add:
       - NET_ADMIN
     environment:
