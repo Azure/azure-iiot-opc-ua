@@ -85,7 +85,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.WebService.Cli {
             do {
                 if (interactive) {
                     Console.Write("> ");
-                    args = Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    args = Console.ReadLine().ParseAsCommandLine();
                 }
                 try {
                     if (args.Length < 1) {
