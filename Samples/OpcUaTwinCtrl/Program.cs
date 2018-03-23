@@ -63,7 +63,7 @@ namespace Microsoft.Azure.IoTSolutions.OpcTwin.WebService.Cli {
                 .AddEnvironmentVariables()
                 .AddJsonFile("appsettings.json", true)
                 .AddInMemoryCollection(new Dictionary<string, string> {
-                    ["Dependencies:OpcTwin:webservice_url"] = "http://localhost:9042/v1"
+                    ["OpcTwinServiceUrl"] = "http://localhost:9042/v1"
                 })
                 .Build();
 
