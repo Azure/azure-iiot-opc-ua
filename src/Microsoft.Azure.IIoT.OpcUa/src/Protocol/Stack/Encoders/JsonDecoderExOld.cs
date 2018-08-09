@@ -10,34 +10,26 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 */
 
-namespace Opc.Ua.Encoders {
+namespace Opc.Ua {
     using System;
     using System.Collections.Generic;
     using System.Text;
     using System.Xml;
     using System.IO;
     using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
     using System.Collections;
-    using Opc.Ua.Extensions;
 
     /// <summary>
     /// Reads objects from reader or string
     /// </summary>
-    public class JsonDecoderEx : IDecoder, IDisposable {
-
-        /// <inheritdoc/>
-        public EncodingType EncodingType => EncodingType.Json;
-
-        /// <inheritdoc/>
-        public ServiceMessageContext Context { get; }
+    public class JsonDecoderExOld : IDecoder, IDisposable {
 
         /// <summary>
         /// Create decoder
         /// </summary>
         /// <param name="context"></param>
         /// <param name="json"></param>
-        public JsonDecoderEx(ServiceMessageContext context, string json) :
+        public JsonDecoderExOld(ServiceMessageContext context, string json) :
             this(context, new JsonTextReader(new StringReader(json))) {
         }
 
@@ -46,7 +38,7 @@ namespace Opc.Ua.Encoders {
         /// </summary>
         /// <param name="context"></param>
         /// <param name="stream"></param>
-        public JsonDecoderEx(ServiceMessageContext context, Stream stream) :
+        public JsonDecoderExOld(ServiceMessageContext context, Stream stream) :
             this(context, new JsonTextReader(new StreamReader(stream))) {
         }
 
@@ -55,32 +47,20 @@ namespace Opc.Ua.Encoders {
         /// </summary>
         /// <param name="context"></param>
         /// <param name="reader"></param>
-        public JsonDecoderEx(ServiceMessageContext context, JsonTextReader reader) {
+        public JsonDecoderExOld(ServiceMessageContext context, JsonTextReader reader) {
             Context = context;
-            var root = JToken.ReadFrom(reader, new JsonLoadSettings {
-                CommentHandling = CommentHandling.Ignore,
-                LineInfoHandling = LineInfoHandling.Ignore
-            });
-            _stack.Push(root as JObject ?? throw new ArgumentException(nameof(reader)));
-            reader.Close();
+            _nestingLevel = 0;
+            _reader = reader;
+            _root = ReadObject();
+            _stack = new Stack<object>();
+            _stack.Push(_root);
         }
 
-        /// <inheritdoc/>
-        public void Dispose() {
-            // No op
-        }
-
-        /// <inheritdoc/>
-        public void PushNamespace(string namespaceUri) {
-            // No op
-        }
-
-        /// <inheritdoc/>
-        public void PopNamespace() {
-            // No op
-        }
-
-        /// <inheritdoc/>
+        /// <summary>
+        /// Initializes the tables used to map namespace and server uris during decoding.
+        /// </summary>
+        /// <param name="namespaceUris">The namespaces URIs referenced by the data being decoded.</param>
+        /// <param name="serverUris">The server URIs referenced by the data being decoded.</param>
         public void SetMappingTables(NamespaceTable namespaceUris, StringTable serverUris) {
             _namespaceMappings = null;
 
@@ -95,205 +75,678 @@ namespace Opc.Ua.Encoders {
             }
         }
 
-
-
-
-
-
-        /// <inheritdoc/>
-        public bool ReadBoolean(string fieldName) =>
-            _stack.Peek().TryGetValue(fieldName, out var value) && (bool)value;
-
-        /// <inheritdoc/>
-        public sbyte ReadSByte(string fieldName) => ReadInteger(fieldName,
-            v => (sbyte) (v < sbyte.MinValue || v > sbyte.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public byte ReadByte(string fieldName) => ReadInteger(fieldName,
-            v => (byte) (v < byte.MinValue || v > byte.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public short ReadInt16(string fieldName) => ReadInteger(fieldName,
-            v => (short) (v < short.MinValue || v > short.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public ushort ReadUInt16(string fieldName) => ReadInteger(fieldName,
-            v => (ushort) (v < ushort.MinValue || v > ushort.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public int ReadInt32(string fieldName) => ReadInteger(fieldName,
-            v => (int) (v < int.MinValue || v > int.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public uint ReadUInt32(string fieldName) => ReadInteger(fieldName,
-            v => (uint) (v < uint.MinValue || v > uint.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public long ReadInt64(string fieldName) => ReadInteger(fieldName,
-            v => v);
-
-        /// <inheritdoc/>
-        public ulong ReadUInt64(string fieldName) => ReadInteger(fieldName,
-            v => (ulong)v);
-
-        /// <inheritdoc/>
-        public float ReadFloat(string fieldName) => ReadDouble(fieldName,
-            v => (float) (v < float.MinValue || v > float.MaxValue ? 0 : v));
-
-        /// <inheritdoc/>
-        public double ReadDouble(string fieldName) => ReadDouble(fieldName,
-            v => v);
-
-        /// <inheritdoc/>
-        public string ReadString(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return null;
-            }
-            return token.ToString();
+        /// <summary>
+        /// Closes the stream used for reading.
+        /// </summary>
+        public void Close() {
+            _reader.Close();
         }
 
-        /// <inheritdoc/>
-        public DateTime ReadDateTime(string fieldName) => ReadNullable(fieldName,
-            t => XmlConvert.ToDateTime(t.ToString(), XmlDateTimeSerializationMode.Utc));
-
-        /// <inheritdoc/>
-        public Uuid ReadGuid(string fieldName) =>
-            new Uuid(ReadString(fieldName));
-
-        /// <inheritdoc/>
-        public byte[] ReadByteString(string fieldName) => Read(fieldName,
-            t => Convert.FromBase64String(t.ToString()));
-
-        /// <inheritdoc/>
-        public XmlElement ReadXmlElement(string fieldName) {
-            return Read(fieldName, t => {
-                var bytes = t.ToObject<byte[]>();
-                if (bytes != null && bytes.Length > 0) {
-                    var document = new XmlDocument {
-                        InnerXml = Encoding.UTF8.GetString(bytes)
-                    };
-                    return document.DocumentElement;
+        /// <summary>
+        /// Closes the stream used for reading.
+        /// </summary>
+        public void Close(bool checkEof) {
+            if (checkEof && _reader.TokenType != JsonToken.EndObject) {
+                while (_reader.Read() && _reader.TokenType != JsonToken.EndObject) {
                 }
-                return null;
-            });
+            }
+
+            _reader.Close();
         }
 
-        /// <inheritdoc/>
-        public NodeId ReadNodeId(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return null;
-            }
-            if (token is JObject o) {
-                _stack.Push(o);
-                var id = ReadString("Id");
-                var uri = ReadString("Uri");
-                if (string.IsNullOrEmpty(uri)) {
-                    var index = (ushort)ReadUInt32("Index");
-                    uri = Context.NamespaceUris.GetString(index);
+        private List<object> ReadArray() {
+            var elements = new List<object>();
+
+            while (_reader.Read() && _reader.TokenType != JsonToken.EndArray) {
+                switch (_reader.TokenType) {
+                    case JsonToken.Comment: {
+                            break;
+                        }
+
+                    case JsonToken.Boolean:
+                    case JsonToken.Integer:
+                    case JsonToken.Float:
+                    case JsonToken.String:
+                    case JsonToken.Bytes:
+                    case JsonToken.Date: {
+                            elements.Add(_reader.Value);
+                            break;
+                        }
+
+                    case JsonToken.StartArray: {
+                            elements.Add(ReadArray());
+                            break;
+                        }
+
+                    case JsonToken.StartObject: {
+                            elements.Add(ReadObject());
+                            break;
+                        }
                 }
-                _stack.Pop();
-                return NodeId.Parse(id);
             }
-            try {
-                return NodeId.Parse(token.ToString());
-            }
-            catch {
-                return token.ToString().ToNodeId(Context);
-            }
+
+            return elements;
         }
 
-        /// <inheritdoc/>
-        public ExpandedNodeId ReadExpandedNodeId(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return null;
-            }
-            if (token is JObject o) {
-                _stack.Push(o);
-                var id = ReadString("Id");
-                var uri = ReadString("Uri");
-                if (string.IsNullOrEmpty(uri)) {
-                    var index = (ushort)ReadUInt32("Index");
-                    uri = Context.NamespaceUris.GetString(index);
+        private Dictionary<string, object> ReadObject() {
+            var fields = new Dictionary<string, object>();
+
+            while (_reader.Read() && _reader.TokenType != JsonToken.EndObject) {
+                if (_reader.TokenType == JsonToken.PropertyName) {
+                    var name = (string)_reader.Value;
+
+                    if (_reader.Read() && _reader.TokenType != JsonToken.EndObject) {
+                        switch (_reader.TokenType) {
+                            case JsonToken.Comment: {
+                                    break;
+                                }
+
+                            case JsonToken.Null:
+                            case JsonToken.Date: {
+                                    fields[name] = _reader.Value;
+                                    break;
+                                }
+
+                            case JsonToken.Bytes:
+                            case JsonToken.Boolean:
+                            case JsonToken.Integer:
+                            case JsonToken.Float:
+                            case JsonToken.String: {
+                                    fields[name] = _reader.Value;
+                                    break;
+                                }
+
+                            case JsonToken.StartArray: {
+                                    fields[name] = ReadArray();
+                                    break;
+                                }
+
+                            case JsonToken.StartObject: {
+                                    fields[name] = ReadObject();
+                                    break;
+                                }
+                        }
+                    }
                 }
-                var serverIndex = (ushort)ReadUInt32("ServerIndex");
-                if (serverIndex == 0) {
-                    var server = ReadString("ServerUri");
-                    serverIndex = Context.NamespaceUris.GetIndexOrAppend(server);
+            }
+
+            return fields;
+        }
+
+        /// <summary>
+        /// Reads the body extension object from the stream.
+        /// </summary>
+        public object ReadExtensionObjectBody(ExpandedNodeId typeId) {
+            return null;
+        }
+
+        /// <summary>
+        /// Frees any unmanaged resources.
+        /// </summary>
+        public void Dispose() {
+            Dispose(true);
+        }
+
+        /// <summary>
+        /// An overrideable version of the Dispose.
+        /// </summary>
+        protected virtual void Dispose(bool disposing) {
+            if (disposing) {
+                if (_reader != null) {
+                    _reader.Close();
                 }
-                _stack.Pop();
-                return new ExpandedNodeId(NodeId.Parse(id), uri, serverIndex);
-            }
-            try {
-                return ExpandedNodeId.Parse(token.ToString());
-            }
-            catch {
-                return token.ToString().ToExpandedNodeId(Context);
             }
         }
 
-        /// <inheritdoc/>
-        public StatusCode ReadStatusCode(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
+        /// <summary>
+        /// The type of encoding being used.
+        /// </summary>
+        public EncodingType EncodingType => EncodingType.Json;
+
+        /// <summary>
+        /// The message context associated with the decoder.
+        /// </summary>
+        public ServiceMessageContext Context { get; }
+
+        /// <summary>
+        /// Pushes a namespace onto the namespace stack.
+        /// </summary>
+        public void PushNamespace(string namespaceUri) {
+        }
+
+        /// <summary>
+        /// Pops a namespace from the namespace stack.
+        /// </summary>
+        public void PopNamespace() {
+        }
+
+        public bool ReadField(string fieldName, out object token) {
+            token = null;
+
+            if (string.IsNullOrEmpty(fieldName)) {
+                token = _stack.Peek();
+                return true;
+            }
+
+            if (!(_stack.Peek() is Dictionary<string, object> context) ||
+                !context.TryGetValue(fieldName, out token)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Reads a boolean from the stream.
+        /// </summary>
+        public bool ReadBoolean(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return false;
+            }
+
+            var value = token as bool?;
+
+            if (value == null) {
+                return false;
+            }
+
+            return (bool)token;
+        }
+
+        /// <summary>
+        /// Reads a sbyte from the stream.
+        /// </summary>
+        public sbyte ReadSByte(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
                 return 0;
             }
-            if (token is JObject o) {
-                _stack.Push(o);
-                var code = new StatusCode(ReadUInt32("Code"));
-                _stack.Pop();
-                return code;
+
+            var value = token as long?;
+
+            if (value == null) {
+                return 0;
             }
-            return ReadInteger(fieldName, v =>
-                (uint)(v < uint.MinValue || v > uint.MaxValue ? 0 : v));
+
+            if (value < sbyte.MinValue || value > sbyte.MaxValue) {
+                return 0;
+            }
+
+            return (sbyte)value;
+        }
+
+        /// <summary>
+        /// Reads a byte from the stream.
+        /// </summary>
+        public byte ReadByte(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+                return 0;
+            }
+
+            if (value < byte.MinValue || value > byte.MaxValue) {
+                return 0;
+            }
+
+            return (byte)value;
+        }
+
+        /// <summary>
+        /// Reads a short from the stream.
+        /// </summary>
+        public short ReadInt16(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+                return 0;
+            }
+
+             if (value < short.MinValue || value > short.MaxValue) {
+                return 0;
+            }
+
+            return (short)value;
+        }
+
+        /// <summary>
+        /// Reads a ushort from the stream.
+        /// </summary>
+        public ushort ReadUInt16(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+                return 0;
+            }
+
+            if (value < ushort.MinValue || value > ushort.MaxValue) {
+                return 0;
+            }
+
+            return (ushort)value;
+        }
+
+        /// <summary>
+        /// Reads an int from the stream.
+        /// </summary>
+        public int ReadInt32(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+                return 0;
+            }
+
+            if (value < int.MinValue || value > int.MaxValue) {
+                return 0;
+            }
+
+            return (int)value;
+        }
+
+        /// <summary>
+        /// Reads a uint from the stream.
+        /// </summary>
+        public uint ReadUInt32(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+
+                if (!(token is string text) || !uint.TryParse(text, out var number)) {
+                    return 0;
+                }
+
+                return number;
+            }
+
+            if (value < uint.MinValue || value > uint.MaxValue) {
+                return 0;
+            }
+
+            return (uint)value;
+        }
+
+        /// <summary>
+        /// Reads a long from the stream.
+        /// </summary>
+        public long ReadInt64(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+
+                if (!(token is string text) || !long.TryParse(text, out var number)) {
+                    return 0;
+                }
+
+                return number;
+            }
+
+            if (value < long.MinValue || value > long.MaxValue) {
+                return 0;
+            }
+
+            return (long)value;
+        }
+
+        /// <summary>
+        /// Reads a ulong from the stream.
+        /// </summary>
+        public ulong ReadUInt64(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as long?;
+
+            if (value == null) {
+
+                if (!(token is string text) || !ulong.TryParse(text, out var number)) {
+                    return 0;
+                }
+
+                return number;
+            }
+
+            if (value < 0) {
+                return 0;
+            }
+
+            return (ulong)value;
+        }
+
+        /// <summary>
+        /// Reads a float from the stream.
+        /// </summary>
+        public float ReadFloat(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as double?;
+
+            if (value == null) {
+
+                if (!(token is string text) || !float.TryParse(text, out var number)) {
+                    var integer = token as long?;
+
+                    if (integer == null) {
+                        return 0;
+                    }
+
+                    return (float)integer;
+                }
+
+                return number;
+            }
+
+            if (value < float.MinValue || value > float.MaxValue) {
+                return 0;
+            }
+
+            return (float)value;
+        }
+
+        /// <summary>
+        /// Reads a double from the stream.
+        /// </summary>
+        public double ReadDouble(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return 0;
+            }
+
+            var value = token as double?;
+
+            if (value == null) {
+
+                if (!(token is string text) || !double.TryParse(text, out var number)) {
+                    var integer = token as long?;
+
+                    if (integer == null) {
+                        return 0;
+                    }
+
+                    return (double)integer;
+                }
+
+                return number;
+            }
+
+            return (double)value;
+        }
+
+        /// <summary>
+        /// Reads a string from the stream.
+        /// </summary>
+        public string ReadString(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return null;
+            }
+
+
+            if (!(token is string value)) {
+                return null;
+            }
+
+            if (Context.MaxStringLength > 0 && Context.MaxStringLength < value.Length) {
+                throw new ServiceResultException(StatusCodes.BadEncodingLimitsExceeded);
+            }
+
+            return value;
+        }
+
+        /// <summary>
+        /// Reads a UTC date/time from the stream.
+        /// </summary>
+        public DateTime ReadDateTime(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return DateTime.MinValue;
+            }
+
+            var value = token as DateTime?;
+
+            if (value != null) {
+                return value.Value;
+            }
+
+            if (token is string text) {
+                return XmlConvert.ToDateTime(text, XmlDateTimeSerializationMode.Utc);
+            }
+
+            return DateTime.MinValue;
+        }
+
+        /// <summary>
+        /// Reads a GUID from the stream.
+        /// </summary>
+        public Uuid ReadGuid(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return Uuid.Empty;
+            }
+
+
+            if (!(token is string value)) {
+                return Uuid.Empty;
+            }
+
+            return new Uuid(value);
+        }
+
+        /// <summary>
+        /// Reads a byte string from the stream.
+        /// </summary>
+        public byte[] ReadByteString(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return null;
+            }
+
+
+            if (!(token is string value)) {
+                return null;
+            }
+
+            var bytes = Convert.FromBase64String(value);
+
+            if (Context.MaxByteStringLength > 0 && Context.MaxByteStringLength < bytes.Length) {
+                throw new ServiceResultException(StatusCodes.BadEncodingLimitsExceeded);
+            }
+
+            return bytes;
+        }
+
+        /// <summary>
+        /// Reads an XmlElement from the stream.
+        /// </summary>
+        public XmlElement ReadXmlElement(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return null;
+            }
+
+
+            if (!(token is string value)) {
+                return null;
+            }
+
+            var bytes = Convert.FromBase64String(value);
+
+            if (bytes != null && bytes.Length > 0) {
+                var document = new XmlDocument {
+                    InnerXml = Encoding.UTF8.GetString(bytes)
+                };
+                return document.DocumentElement;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Reads an NodeId from the stream.
+        /// </summary>
+        public NodeId ReadNodeId(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return null;
+            }
+
+            if (!(token is string value)) {
+                return null;
+            }
+
+            return NodeId.Parse(value);
+        }
+
+        /// <summary>
+        /// Reads an ExpandedNodeId from the stream.
+        /// </summary>
+        public ExpandedNodeId ReadExpandedNodeId(string fieldName) {
+
+            if (!ReadField(fieldName, out var token)) {
+                return null;
+            }
+
+
+            if (!(token is string value)) {
+                return null;
+            }
+
+            return ExpandedNodeId.Parse(value);
+        }
+
+        /// <summary>
+        /// Reads an StatusCode from the stream.
+        /// </summary>
+        public StatusCode ReadStatusCode(string fieldName) {
+            return ReadUInt32(fieldName);
         }
 
         /// <summary>
         /// Reads an DiagnosticInfo from the stream.
         /// </summary>
         public DiagnosticInfo ReadDiagnosticInfo(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
+
+            if (!ReadField(fieldName, out var token)) {
                 return null;
             }
-            if (token is JObject o) {
-                _stack.Push(o);
-                var di = new DiagnosticInfo {
-                    SymbolicId = ReadInt32("SymbolicId"),
-                    NamespaceUri = ReadInt32("NamespaceUri"),
-                    Locale = ReadInt32("Locale"),
-                    LocalizedText = ReadInt32("LocalizedText"),
-                    AdditionalInfo = ReadString("AdditionalInfo"),
-                    InnerStatusCode = ReadStatusCode("InnerStatusCode"),
-                    InnerDiagnosticInfo =
-                        ReadDiagnosticInfo("InnerDiagnosticInfo")
-                };
-                _stack.Pop();
+
+
+            if (!(token is Dictionary<string, object> value)) {
+                return null;
+            }
+
+            // check the nesting level for avoiding a stack overflow.
+            if (_nestingLevel > Context.MaxEncodingNestingLevels) {
+                throw ServiceResultException.Create(
+                    StatusCodes.BadEncodingLimitsExceeded,
+                    "Maximum nesting level of {0} was exceeded",
+                    Context.MaxEncodingNestingLevels);
+            }
+
+            try {
+                _nestingLevel++;
+                _stack.Push(value);
+
+                var di = new DiagnosticInfo();
+
+                if (value.ContainsKey("SymbolicId")) {
+                    di.SymbolicId = ReadInt32("SymbolicId");
+                }
+
+                if (value.ContainsKey("NamespaceUri")) {
+                    di.NamespaceUri = ReadInt32("NamespaceUri");
+                }
+
+                if (value.ContainsKey("Locale")) {
+                    di.Locale = ReadInt32("Locale");
+                }
+
+                if (value.ContainsKey("LocalizedText")) {
+                    di.LocalizedText = ReadInt32("LocalizedText");
+                }
+
+                if (value.ContainsKey("AdditionalInfo")) {
+                    di.AdditionalInfo = ReadString("AdditionalInfo");
+                }
+
+                if (value.ContainsKey("InnerStatusCode")) {
+                    di.InnerStatusCode = ReadStatusCode("InnerStatusCode");
+                }
+
+                if (value.ContainsKey("InnerDiagnosticInfo")) {
+                    di.InnerDiagnosticInfo = ReadDiagnosticInfo("InnerDiagnosticInfo");
+                }
+
                 return di;
             }
-            return null;
+            finally {
+                _nestingLevel--;
+                _stack.Pop();
+            }
         }
 
         /// <summary>
         /// Reads an QualifiedName from the stream.
         /// </summary>
         public QualifiedName ReadQualifiedName(string fieldName) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
+
+            if (!ReadField(fieldName, out var token)) {
                 return null;
             }
-            if (token is JObject o) {
-                _stack.Push(o);
-                var name = ReadString("Name");
-                var index = ReadUInt16("Uri");
-                if (index == 0) {
-                    // Non reversible
-                    index = (ushort)ReadUInt32("Index");
-                    if (index == 0) {
-                        var uri = ReadString("Uri");
-                        index = Context.NamespaceUris.GetIndexOrAppend(uri);
-                    }
+
+            if (!(token is Dictionary<string, object> value)) {
+                if (token is string name) {
+                    return new QualifiedName(name, 0);
                 }
-                _stack.Pop();
-                return new QualifiedName(name, index);
+                return null;
             }
-            return null;
+
+            try {
+                _stack.Push(value);
+
+                var name = ReadString("Name");
+                var namespaceIndex = ReadUInt16("Uri");
+
+                return new QualifiedName(name, namespaceIndex);
+            }
+            finally {
+                _stack.Pop();
+            }
         }
 
         /// <summary>
@@ -624,6 +1077,26 @@ namespace Opc.Ua.Encoders {
             }
 
             return (Enum)Enum.ToObject(enumType, ReadInt32(fieldName));
+        }
+
+        private bool ReadArrayField(string fieldName, out List<object> array) {
+            object token = array = null;
+
+            if (!ReadField(fieldName, out token)) {
+                return false;
+            }
+
+            array = token as List<object>;
+
+            if (array == null) {
+                return false;
+            }
+
+            if (Context.MaxArrayLength > 0 && Context.MaxArrayLength < array.Count) {
+                throw new ServiceResultException(StatusCodes.BadEncodingLimitsExceeded);
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -1296,99 +1769,11 @@ namespace Opc.Ua.Encoders {
             return values;
         }
 
-
-
-
-        /// <summary>
-        /// Reads integer
-        /// </summary>
-        private T ReadInteger<T>(string fieldName, Func<long, T> convert) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return default(T);
-            }
-            return convert(token.ToObject<long>());
-        }
-
-        /// <summary>
-        /// Reads double
-        /// </summary>
-        private T ReadDouble<T>(string fieldName, Func<double, T> convert) {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return default(T);
-            }
-            return convert(token.ToObject<double>());
-        }
-
-        private T ReadNullable<T>(string fieldName, Func<JToken, T> fallback)
-            where T : struct {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return default(T);
-            }
-            var value = token.ToObject<T?>();
-            if (value != null) {
-                return value.Value;
-            }
-            try {
-                return fallback(token);
-            }
-            catch {
-                return default(T);
-            }
-        }
-
-        private T Read<T>(string fieldName, Func<JToken, T> fallback)
-            where T : class {
-            if (!_stack.Peek().TryGetValue(fieldName, out var token)) {
-                return default(T);
-            }
-            var value = token.ToObject<T>();
-            if (value != null) {
-                return value;
-            }
-            try {
-                return fallback(token);
-            }
-            catch {
-                return default(T);
-            }
-        }
-
-
-
-        private bool ReadArrayField(string fieldName, out List<object> array) {
-            object token = array = null;
-
-            if (!ReadField(fieldName, out token)) {
-                return false;
-            }
-
-            array = token as List<object>;
-
-            if (array == null) {
-                return false;
-            }
-
-            if (Context.MaxArrayLength > 0 && Context.MaxArrayLength < array.Count) {
-                throw new ServiceResultException(StatusCodes.BadEncodingLimitsExceeded);
-            }
-
-            return true;
-        }
-
-        public bool ReadField(string fieldName, out object token) {
-            token = _stack.Peek();
-            if (string.IsNullOrEmpty(fieldName)) {
-                return true;
-            }
-            if (!(token is Dictionary<string, object> context) ||
-                !context.TryGetValue(fieldName, out token)) {
-                return false;
-            }
-            return true;
-        }
-
+        private JsonTextReader _reader;
+        private readonly Dictionary<string, object> _root;
+        private Stack<object> _stack;
         private ushort[] _namespaceMappings;
         private ushort[] _serverMappings;
-        private readonly Stack<JObject> _stack = new Stack<JObject>();
+        private uint _nestingLevel;
     }
 }

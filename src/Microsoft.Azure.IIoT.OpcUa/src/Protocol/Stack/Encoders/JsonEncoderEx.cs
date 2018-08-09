@@ -318,13 +318,15 @@ namespace Opc.Ua.Encoders {
                 WriteNull(fieldName);
             }
             else if (UseReversibleEncoding) {
-                WriteString(fieldName, value.ToString());
-            }
-            else if (UseNodeUriEncoding) {
-                WriteString(fieldName, value.AsString(Context));
+                if (UseNodeUriEncoding) {
+                    WriteString(fieldName, value.AsString(Context));
+                }
+                else {
+                    // Back compat to json encoding
+                    WriteString(fieldName, value.ToString());
+                }
             }
             else {
-                // Back compat to json encoding
                 PushStructure(fieldName);
                 _writer.WritePropertyName("Id");
                 _writer.WriteValue(new NodeId(value.Identifier, 0).ToString());
@@ -339,13 +341,15 @@ namespace Opc.Ua.Encoders {
                 WriteNull(fieldName);
             }
             else if (UseReversibleEncoding) {
-                WriteString(fieldName, value.ToString());
-            }
-            else if (UseNodeUriEncoding) {
-                WriteString(fieldName, value.AsString(Context));
+                if (UseNodeUriEncoding) {
+                    WriteString(fieldName, value.AsString(Context));
+                }
+                else {
+                    // Back compat to json encoding
+                    WriteString(fieldName, value.ToString());
+                }
             }
             else {
-                // Back compat to json encoding
                 PushStructure(fieldName);
                 _writer.WritePropertyName("Id");
                 _writer.WriteValue(new NodeId(value.Identifier, 0).ToString());
