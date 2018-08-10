@@ -261,11 +261,11 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Export {
                 throw new ArgumentNullException(nameof(contentType));
             }
             switch (contentType.ToLowerInvariant()) {
-                case TypeSerializer.MimeTypeUaJson:
+                case ContentEncodings.MimeTypeUaJson:
                     return ".ua.json";
-                case TypeSerializer.MimeTypeUaBinary:
+                case ContentEncodings.MimeTypeUaBinary:
                     return ".ua.bin";
-                case TypeSerializer.MimeTypeUaXml:
+                case ContentEncodings.MimeTypeUaXml:
                     return ".ua.xml";
                 default:
                     throw new ArgumentException(nameof(contentType));

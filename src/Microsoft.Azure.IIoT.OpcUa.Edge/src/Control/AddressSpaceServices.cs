@@ -152,7 +152,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                         var dataTypeIdNode = session.ReadNode(argument.DataType);
                         var arg = new MethodArgumentModel {
                             Name = argument.Name,
-                            Value = _codec.Encode(new Variant(argument.Value)),
+                            Value = _codec.Encode(new Variant(argument.Value), session.MessageContext),
                             ValueRank = argument.ValueRank,
                             ArrayDimensions = argument.ArrayDimensions.ToArray(),
                             Description = argument.Description.ToString(),
@@ -210,7 +210,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                         values[0].SourcePicoseconds : (ushort?)null;
                     result.SourceTimestamp = values[0].SourceTimestamp != DateTime.MinValue ?
                         values[0].SourceTimestamp : (DateTime?)null;
-                    result.Value = _codec.Encode(values[0].WrappedValue);
+                    result.Value = _codec.Encode(values[0].WrappedValue, session.MessageContext);
                 }
                 if (diagnosticInfos != null && diagnosticInfos.Count > 0) {
                     result.Diagnostics = JToken.FromObject(diagnosticInfos[0]);
@@ -253,8 +253,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                     new WriteValue {
                         NodeId = writeNode,
                         AttributeId = Attributes.Value,
-                        Value = new DataValue(_codec.Decode(
-                            request.Value?.ToString(), builtinType, request.Node.ValueRank)),
+                        Value = new DataValue(_codec.Decode(request.Value,
+                            builtinType, request.Node.ValueRank, session.MessageContext)),
                         IndexRange = null
                     }
                 };
@@ -294,7 +294,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                     foreach (var arg in request.InputArguments) {
                         var builtinType = TypeInfo.GetBuiltInType(
                             arg.TypeId.ToNodeId(session.MessageContext), session.TypeTree);
-                        args.Add(_codec.Decode(arg.Value?.ToString(), builtinType, arg.ValueRank));
+                        args.Add(_codec.Decode(arg.Value, builtinType, arg.ValueRank,
+                            session.MessageContext));
                     }
                 }
                 var methodId = request.MethodId?.ToNodeId(session.MessageContext);
@@ -318,7 +319,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                 if (results != null && results.Count > 0 &&
                     StatusCode.IsGood(results[0].StatusCode)) {
                     result.Results = results[0].OutputArguments
-                        .Select(_codec.Encode)
+                        .Select(v => _codec.Encode(v, session.MessageContext))
                         .ToList();
                 }
                 if (diagnosticInfos != null && diagnosticInfos.Count > 0) {

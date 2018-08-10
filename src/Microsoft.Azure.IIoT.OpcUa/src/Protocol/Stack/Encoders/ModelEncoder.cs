@@ -10,6 +10,7 @@ namespace Opc.Ua.Encoders {
     using System.Xml;
     using System.IO;
     using System.Linq;
+    using Microsoft.Azure.IIoT;
 
     /// <summary>
     /// Encoder wrapper to encode model
@@ -333,12 +334,12 @@ namespace Opc.Ua.Encoders {
                 throw new ArgumentNullException(nameof(stream));
             }
             switch (contentType.ToLowerInvariant()) {
-                case TypeSerializer.MimeTypeUaJson:
+                case ContentEncodings.MimeTypeUaJson:
                     return new JsonEncoderEx(context, new StreamWriter(stream));
-                case TypeSerializer.MimeTypeUaBinary:
+                case ContentEncodings.MimeTypeUaBinary:
                     return new BinaryEncoder(stream,
                         context);
-                case TypeSerializer.MimeTypeUaXml:
+                case ContentEncodings.MimeTypeUaXml:
                     return new XmlEncoder((Type)null, XmlWriter.Create(stream),
                         context);
                 default:
