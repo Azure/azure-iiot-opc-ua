@@ -64,7 +64,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
 
             try {
                 var host = twinScope.Resolve<IEdgeHost>();
-                await host.StartAsync("twin", _events.SiteId);
+                await host.StartAsync("twin", _events.SiteId, "OpcTwin");
                 _logger.Info($"{id} twin started.", () => { });
             }
             catch (Exception ex) {
