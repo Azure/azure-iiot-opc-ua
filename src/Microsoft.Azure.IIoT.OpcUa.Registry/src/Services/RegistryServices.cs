@@ -714,7 +714,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
                     if (result.DiscoveryConfig.ActivationFilter == null) {
                         // Use global activation filter
                         result.DiscoveryConfig.ActivationFilter =
-                            result.DiscoveryConfig?.ActivationFilter;
+                            supervisor.DiscoveryConfig?.ActivationFilter;
                     }
                 }
 
