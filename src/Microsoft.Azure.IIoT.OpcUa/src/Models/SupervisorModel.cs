@@ -4,8 +4,6 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.OpcUa.Models {
-    using System;
-    using System.Collections.Generic;
 
     /// <summary>
     /// Supervisor registration
@@ -31,11 +29,6 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
         /// Supervisor discovery config
         /// </summary>
         public DiscoveryConfigModel DiscoveryConfig { get; set; }
-
-        /// <summary>
-        /// Currently registered callbacks
-        /// </summary>
-        public List<CallbackModel> DiscoveryCallbacks { get; set; }
 
         /// <summary>
         /// Supervisor public client cert

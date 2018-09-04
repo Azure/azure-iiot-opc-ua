@@ -176,7 +176,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol.Services {
                         Task.Run(() => Discover(discoveryUrl, nextServer.Item2,
                             Timeout, visitedUris, queue, results), ct),
                         _ => !ct.IsCancellationRequested, Retry.NoBackoff,
-                        kMaxDiscoveryAttempts).ConfigureAwait(false);
+                        kMaxDiscoveryAttempts - 1).ConfigureAwait(false);
                 }
                 catch (Exception ex) {
                     _logger.Error($"Error at {discoveryUrl} (after {sw.Elapsed}).",
