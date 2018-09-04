@@ -145,13 +145,13 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
             public TwinConfig(IEdgeConfig config, string endpointId, string secret) {
                 BypassCertVerification = config.BypassCertVerification;
                 Transport = config.Transport;
-                HubConnectionString = GetEdgeConnectionString(config, endpointId, secret);
+                EdgeHubConnectionString = GetEdgeConnectionString(config, endpointId, secret);
             }
 
             /// <summary>
             /// Twin configuration
             /// </summary>
-            public string HubConnectionString { get; }
+            public string EdgeHubConnectionString { get; }
             public bool BypassCertVerification { get; }
             public TransportOption Transport { get; }
 
@@ -165,7 +165,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
             private static string GetEdgeConnectionString(IEdgeConfig config,
                 string endpointId, string secret) {
 
-                var cs = config.HubConnectionString;
+                var cs = config.EdgeHubConnectionString;
                 if (string.IsNullOrEmpty(cs)) {
                     // Retrieve information from environment
                     var hostName = Environment.GetEnvironmentVariable("IOTEDGE_IOTHUBHOSTNAME");
