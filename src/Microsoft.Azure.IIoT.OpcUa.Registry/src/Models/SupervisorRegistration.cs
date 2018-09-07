@@ -22,7 +22,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
         #region Twin Tags
 
         /// <summary>
-        /// Edge supervisor that owns the twin.
+        /// Supervisor that owns the twin.
         /// </summary>
         public override string SupervisorId =>
             SupervisorModelEx.CreateSupervisorId(DeviceId, ModuleId);
@@ -352,8 +352,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
             if (desired != null) {
                 desired.Connected = connected;
                 if (desired.SiteId == null && consolidated.SiteId != null) {
-                    // Not set by user, but by config on edge, so fake user
-                    // desiring it.
+                    // Not set by user, but by config, so fake user desiring it.
                     desired.SiteId = consolidated.SiteId;
                 }
             }

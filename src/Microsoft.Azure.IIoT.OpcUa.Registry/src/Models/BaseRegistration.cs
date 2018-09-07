@@ -37,7 +37,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
         public abstract string DeviceType { get; }
 
         /// <summary>
-        /// Edge supervisor that owns the twin.
+        /// Supervisor that owns the twin.
         /// </summary>
         public virtual string SupervisorId { get; set; }
 

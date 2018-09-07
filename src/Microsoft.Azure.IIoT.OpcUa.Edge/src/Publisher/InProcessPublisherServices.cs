@@ -32,7 +32,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Publisher {
         public EndpointModel Endpoint { get; set; }
 
         /// <summary>
-        /// Create edge twin services
+        /// Create in process publisher service
         /// </summary>
         /// <param name="client"></param>
         public InProcessPublisherServices(IEndpointServices client, ITwinProperties twin,

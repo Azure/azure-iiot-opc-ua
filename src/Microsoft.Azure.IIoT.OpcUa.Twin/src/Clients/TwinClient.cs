@@ -16,9 +16,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Twin.Clients {
     using System.Diagnostics;
 
     /// <summary>
-    /// Implements node and publish services through edge command control against
-    /// the OPC UA edge device module receiving service requests via device method
-    /// call.
+    /// Implements node and publish services through command control against
+    /// the OPC twin module receiving service requests via device method calls.
     /// </summary>
     public sealed class TwinClient : IBrowseServices<string>,
         INodeServices<string>, IPublishServices<string> {

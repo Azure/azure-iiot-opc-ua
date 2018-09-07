@@ -37,7 +37,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
 
         /// <summary>
         /// Whether the registration is out of sync between
-        /// client (edge) and server (service) (default: false).
+        /// client (module) and server (service) (default: false).
         /// </summary>
         public bool? OutOfSync { get; set; }
 
