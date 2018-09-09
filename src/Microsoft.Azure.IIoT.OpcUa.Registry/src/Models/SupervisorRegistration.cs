@@ -15,8 +15,10 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
     /// </summary>
     public sealed class SupervisorRegistration : BaseRegistration {
 
+        /// <inheritdoc/>
         public override string DeviceType => "Supervisor";
 
+        /// <inheritdoc/>
         public override string ApplicationId => null;
 
         #region Twin Tags
@@ -248,7 +250,9 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
         /// Decode tags and property into registration object
         /// </summary>
         /// <param name="deviceId"></param>
+        /// <param name="moduleId"></param>
         /// <param name="etag"></param>
+        /// <param name="tags"></param>
         /// <param name="properties"></param>
         /// <returns></returns>
         public static SupervisorRegistration FromTwin(string deviceId, string moduleId,
@@ -328,6 +332,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
         /// endpoint.
         /// </summary>
         /// <param name="twin"></param>
+        /// <param name="connected"></param>
         /// <param name="onlyServerState">Only desired endpoint should be returned
         /// this means that you will look at stale information.</param>
         /// <returns></returns>
@@ -368,6 +373,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
         /// Patch this registration and create patch twin model to upload
         /// </summary>
         /// <param name="model"></param>
+        /// <param name="disabled"></param>
         public static SupervisorRegistration FromServiceModel(
             SupervisorModel model, bool? disabled = null) {
             if (model == null) {
@@ -423,11 +429,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
             };
         }
 
-        /// <summary>
-        /// Equality
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool Equals(object obj) {
             var registration = obj as SupervisorRegistration;
             return base.Equals(registration) &&
@@ -460,17 +462,16 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Models {
                         (callback1, callback2) => callback1.IsSameAs(callback2));
         }
 
+        /// <inheritdoc/>
         public static bool operator ==(SupervisorRegistration r1,
             SupervisorRegistration r2) =>
             EqualityComparer<SupervisorRegistration>.Default.Equals(r1, r2);
 
+        /// <inheritdoc/>
         public static bool operator !=(SupervisorRegistration r1,
             SupervisorRegistration r2) => !(r1 == r2);
 
-        /// <summary>
-        /// Hash code
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override int GetHashCode() {
             var hashCode = base.GetHashCode();
             hashCode = hashCode * -1521134295 +

@@ -20,6 +20,7 @@ namespace Opc.Ua.Encoders {
         /// <summary>
         /// Create wrapper
         /// </summary>
+        /// <param name="contentType"></param>
         /// <param name="callback"></param>
         /// <param name="stream"></param>
         public ModelEncoder(Stream stream, string contentType,
@@ -34,6 +35,7 @@ namespace Opc.Ua.Encoders {
         /// <summary>
         /// Create wrapper
         /// </summary>
+        /// <param name="contentType"></param>
         /// <param name="callback"></param>
         /// <param name="context"></param>
         /// <param name="stream"></param>
@@ -46,7 +48,7 @@ namespace Opc.Ua.Encoders {
         /// Create wrapper
         /// </summary>
         /// <param name="wrapped"></param>
-        /// <param name="wrapped"></param>
+        /// <param name="callback"></param>
         public ModelEncoder(IEncoder wrapped, Action<ExpandedNodeId> callback) {
             _wrapped = wrapped ?? throw new ArgumentNullException(nameof(wrapped));
             _callback = callback;

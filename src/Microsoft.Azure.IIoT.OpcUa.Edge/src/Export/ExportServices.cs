@@ -234,6 +234,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Export {
         /// </summary>
         /// <param name="endpoint"></param>
         /// <param name="node"></param>
+        /// <param name="ct"></param>
         /// <returns></returns>
         private Task<ReferenceDescriptionCollection> FetchReferencesAsync(
             EndpointModel endpoint, Node node, CancellationToken ct) =>
@@ -245,6 +246,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Export {
         /// </summary>
         /// <param name="endpoint"></param>
         /// <param name="nodeId"></param>
+        /// <param name="ct"></param>
         /// <returns></returns>
         private Task<Node> ReadNodeAsync(EndpointModel endpoint,
             ExpandedNodeId nodeId, CancellationToken ct) =>

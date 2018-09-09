@@ -29,6 +29,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
         /// Create registry services
         /// </summary>
         /// <param name="iothub"></param>
+        /// <param name="client"></param>
+        /// <param name="logger"></param>
         public RegistryServices(IIoTHubTwinServices iothub, IHttpClient client,
             ILogger logger) {
             _iothub = iothub ?? throw new ArgumentNullException(nameof(iothub));
@@ -217,8 +219,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
             }
 
             // Check whether to enable or disable...
-            var isEnabled = (patched.Activated ?? false);
-            var enable = (request.Activate ?? isEnabled);
+            var isEnabled = patched.Activated ?? false;
+            var enable = request.Activate ?? isEnabled;
             patched.Activated = request.Activate;
 
             // Patch
@@ -874,6 +876,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
         /// <param name="result"></param>
         /// <param name="found"></param>
         /// <param name="existing"></param>
+        /// <param name="hardDelete"></param>
         /// <returns></returns>
         private async Task MergeEndpointsAsync(DiscoveryResultModel result,
             string supervisorId, IEnumerable<EndpointRegistration> found,
@@ -1132,6 +1135,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
         /// </summary>
         /// <param name="result"></param>
         /// <param name="supervisorId"></param>
+        /// <param name="siteId"></param>
         /// <param name="exception"></param>
         /// <returns></returns>
         private async Task CallDiscoveryCallbacksAsync(DiscoveryResultModel result,
@@ -1165,6 +1169,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
         /// Convert device twin registration property to registration model
         /// </summary>
         /// <param name="twin"></param>
+        /// <param name="skipInvalid"></param>
         /// <param name="onlyServerState">Only desired should be returned
         /// this means that you will look at stale information.</param>
         /// <returns></returns>

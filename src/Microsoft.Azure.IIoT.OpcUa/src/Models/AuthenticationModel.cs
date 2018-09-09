@@ -6,6 +6,9 @@
 namespace Microsoft.Azure.IIoT.OpcUa.Models {
     using Newtonsoft.Json.Linq;
 
+    /// <summary>
+    /// Authentication model
+    /// </summary>
     public class AuthenticationModel {
 
         /// <summary>

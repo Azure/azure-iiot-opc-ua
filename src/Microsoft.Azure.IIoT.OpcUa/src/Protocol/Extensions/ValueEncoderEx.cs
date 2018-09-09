@@ -7,11 +7,15 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol {
     using Newtonsoft.Json.Linq;
     using Opc.Ua;
 
+    /// <summary>
+    /// Value encoder extensions
+    /// </summary>
     public static class ValueEncoderEx {
 
         /// <summary>
         /// Format variant as string
         /// </summary>
+        /// <param name="encoder"></param>
         /// <param name="value"></param>
         /// <returns></returns>
         public static JToken Encode(this IValueEncoder encoder, Variant value) =>
@@ -20,6 +24,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol {
         /// <summary>
         /// Parse token to variant
         /// </summary>
+        /// <param name="encoder"></param>
         /// <param name="value"></param>
         /// <param name="builtinType"></param>
         /// <param name="valueRank"></param>
@@ -31,6 +36,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol {
         /// <summary>
         /// Parse token to variant
         /// </summary>
+        /// <param name="encoder"></param>
         /// <param name="value"></param>
         /// <param name="builtinType"></param>
         /// <returns></returns>
@@ -41,6 +47,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol {
         /// <summary>
         /// Parse token to variant
         /// </summary>
+        /// <param name="encoder"></param>
         /// <param name="value"></param>
         /// <returns></returns>
         public static Variant Decode(this IValueEncoder encoder, JToken value) =>

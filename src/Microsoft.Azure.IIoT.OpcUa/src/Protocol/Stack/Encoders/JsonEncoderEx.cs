@@ -434,9 +434,9 @@ namespace Opc.Ua.Encoders {
                 WriteNull(property);
             }
             else {
-                var isNull = (value.TypeInfo == null ||
+                var isNull = value.TypeInfo == null ||
                     value.TypeInfo.BuiltInType == BuiltInType.Null ||
-                    value.Value == null);
+                    value.Value == null;
 
                 if (UseReversibleEncoding && !isNull) {
                     PushObject(property);

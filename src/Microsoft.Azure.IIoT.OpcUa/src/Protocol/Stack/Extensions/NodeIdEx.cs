@@ -10,6 +10,9 @@ namespace Opc.Ua.Extensions {
     using System.Xml;
     using Opc.Ua;
 
+    /// <summary>
+    /// Node id extensions
+    /// </summary>
     public static class NodeIdEx {
 
         /// <summary>
@@ -439,6 +442,7 @@ namespace Opc.Ua.Extensions {
         /// Parse identfier from string
         /// </summary>
         /// <param name="text"></param>
+        /// <param name="type"></param>
         /// <returns></returns>
         private static object ParseIdentifier(char type, string text) {
             switch (type) {

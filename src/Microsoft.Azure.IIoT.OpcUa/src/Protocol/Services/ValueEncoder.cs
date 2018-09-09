@@ -23,6 +23,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol.Services {
         /// Formats a variant as string
         /// </summary>
         /// <param name="value"></param>
+        /// <param name="context"></param>
         /// <returns></returns>
         public JToken Encode(Variant value, ServiceMessageContext context) {
             if (value == Variant.Null) {
@@ -49,6 +50,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol.Services {
         /// </summary>
         /// <param name="value"></param>
         /// <param name="builtinType"></param>
+        /// <param name="valueRank"></param>
+        /// <param name="context"></param>
         /// <returns></returns>
         public Variant Decode(JToken value, BuiltInType builtinType, int? valueRank,
             ServiceMessageContext context) {
@@ -94,7 +97,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol.Services {
         /// <returns></returns>
         private static JToken Sanitize(JToken value, bool isString,
             int? valueRank) {
-            var array = (valueRank.HasValue && valueRank.Value != ValueRanks.Scalar);
+            var array = valueRank.HasValue && valueRank.Value != ValueRanks.Scalar;
             if (!isString || array) {
                 if (!array) {
                     value = value.ToString().TrimQuotes();

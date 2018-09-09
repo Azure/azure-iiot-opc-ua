@@ -49,8 +49,11 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Discovery {
         internal DiscoveryRequest Request { get; set; } = new DiscoveryRequest();
 
         /// <summary>
-        /// Create service
+        /// Create services
         /// </summary>
+        /// <param name="client"></param>
+        /// <param name="events"></param>
+        /// <param name="processor"></param>
         /// <param name="logger"></param>
         public DiscoveryServices(IEndpointDiscovery client, IEventEmitter events,
             ITaskProcessor processor, ILogger logger) {
@@ -125,7 +128,10 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Discovery {
         /// <summary>
         /// Scan and discover in continuous loop
         /// </summary>
+        /// <param name="request"></param>
+        /// <param name="delay"></param>
         /// <param name="ct"></param>
+        /// <returns></returns>
         private async Task RunContinouslyAsync(DiscoveryRequest request,
             TimeSpan? delay, CancellationToken ct) {
 
@@ -229,6 +235,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Discovery {
         /// <summary>
         /// Run a network discovery
         /// </summary>
+        /// <param name="request"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
         private async Task<List<ApplicationRegistrationModel>> DiscoverServersAsync(
@@ -409,6 +416,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Discovery {
         /// <param name="discovered"></param>
         /// <param name="timestamp"></param>
         /// <param name="request"></param>
+        /// <param name="diagnostics"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
         private async Task UploadResultsAsync(DiscoveryRequest request,

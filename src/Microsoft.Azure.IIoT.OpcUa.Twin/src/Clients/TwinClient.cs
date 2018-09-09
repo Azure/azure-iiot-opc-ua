@@ -26,6 +26,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Twin.Clients {
         /// Create service
         /// </summary>
         /// <param name="twin"></param>
+        /// <param name="logger"></param>
         public TwinClient(IIoTHubTwinServices twin, ILogger logger) {
             _twin = twin ?? throw new ArgumentNullException(nameof(twin));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -167,6 +168,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Twin.Clients {
         /// Get list of published nodes
         /// </summary>
         /// <param name="twinId"></param>
+        /// <param name="continuation"></param>
         /// <returns></returns>
         public async Task<PublishedNodeListModel> ListPublishedNodesAsync(
             string twinId, string continuation) {

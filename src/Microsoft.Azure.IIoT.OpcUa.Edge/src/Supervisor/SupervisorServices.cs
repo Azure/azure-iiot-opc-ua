@@ -24,6 +24,10 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
         /// <summary>
         /// Create twin supervisor creating and managing twin instances
         /// </summary>
+        /// <param name="factory"></param>
+        /// <param name="config"></param>
+        /// <param name="events"></param>
+        /// <param name="logger"></param>
         public SupervisorServices(IContainerFactory factory, IModuleConfig config,
             IEventEmitter events, ILogger logger) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -36,6 +40,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
         /// <summary>
         /// Start twin
         /// </summary>
+        /// <param name="id"></param>
         /// <param name="secret"></param>
         /// <returns></returns>
         public async Task StartTwinAsync(string id, string secret) {
@@ -141,6 +146,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Supervisor {
             /// Create twin configuration
             /// </summary>
             /// <param name="config"></param>
+            /// <param name="endpointId"></param>
             /// <param name="secret"></param>
             public TwinConfig(IModuleConfig config, string endpointId, string secret) {
                 BypassCertVerification = config.BypassCertVerification;

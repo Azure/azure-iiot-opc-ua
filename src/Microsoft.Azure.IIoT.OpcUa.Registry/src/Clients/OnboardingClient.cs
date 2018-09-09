@@ -23,6 +23,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Clients {
         /// Create onboarding client
         /// </summary>
         /// <param name="iothub"></param>
+        /// <param name="events"></param>
+        /// <param name="logger"></param>
         public OnboardingClient(IIoTHubTwinServices iothub,
             IIoTHubMessagingServices events, ILogger logger) {
 

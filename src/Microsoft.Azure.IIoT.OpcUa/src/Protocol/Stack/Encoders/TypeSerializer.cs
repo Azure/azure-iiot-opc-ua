@@ -10,12 +10,16 @@ namespace Opc.Ua.Encoders {
     using Newtonsoft.Json;
     using Microsoft.Azure.IIoT;
 
+    /// <summary>
+    /// Type serializer service implementation
+    /// </summary>
     public class TypeSerializer : ITypeSerializer {
 
         /// <summary>
         /// Create codec
         /// </summary>
         /// <param name="contentType"></param>
+        /// <param name="context"></param>
         public TypeSerializer(string contentType, ServiceMessageContext context) {
             MimeType = contentType;
             _context = context;

@@ -25,6 +25,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Publisher {
         /// Create client service to control publisher
         /// </summary>
         /// <param name="client"></param>
+        /// <param name="logger"></param>
         public PublisherModuleServerClient(IEndpointServices client, ILogger logger) {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

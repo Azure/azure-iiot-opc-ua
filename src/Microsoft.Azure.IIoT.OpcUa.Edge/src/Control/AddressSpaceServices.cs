@@ -67,7 +67,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                     // Browse and read children
                     result.References = new List<NodeReferenceModel>();
                     var response = session.Browse(null, null, rootId,
-                        (request.MaxReferencesToReturn ?? 0u),
+                        request.MaxReferencesToReturn ?? 0u,
                         direction, typeId, !(request?.NoSubtypes ?? false), 0,
                         out var continuationPoint, out var references);
                     result.ContinuationToken = await AddReferencesToBrowseResult(session,
@@ -135,7 +135,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                     if (result.OutputArguments != null && result.InputArguments != null) {
                         break;
                     }
-                    var isInput = (nodeReference.BrowseName == BrowseNames.InputArguments);
+                    var isInput = nodeReference.BrowseName == BrowseNames.InputArguments;
                     if (!isInput && nodeReference.BrowseName != BrowseNames.OutputArguments) {
                         continue;
                     }
@@ -409,7 +409,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                                 Opc.Ua.BrowseDirection.Forward,
                                 ReferenceTypeIds.HierarchicalReferences, true, 1,
                                 out var tmp, out var childReferences);
-                            children = (childReferences.Count != 0);
+                            children = childReferences.Count != 0;
                         }
                         catch {
                             children = false;

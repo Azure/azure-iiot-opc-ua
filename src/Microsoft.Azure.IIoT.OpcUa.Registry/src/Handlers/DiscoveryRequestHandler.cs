@@ -29,6 +29,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Handlers {
         /// Create handler
         /// </summary>
         /// <param name="discovery"></param>
+        /// <param name="processor"></param>
         /// <param name="logger"></param>
         public DiscoveryRequestHandler(IDiscoveryServices discovery,
             ITaskProcessor processor, ILogger logger) {
