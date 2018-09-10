@@ -856,9 +856,14 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
                 // Notify callbacks
                 await CallDiscoveryCallbacksAsync(result, supervisorId, siteId, null);
 
-                if (added != 0 || removed != 0) {
-                    _logger.Info($"... processed discovery results: {added} applications added, " +
-                        $"{updated} enabled, {removed} disabled, and {unchanged} unchanged.",
+                var log = added != 0 || removed != 0 || updated != 0;
+#if DEBUG
+                log = true;
+#endif
+                if (log) {
+                    _logger.Info($"... processed discovery results from {supervisorId}: " +
+                        $"{added} applications added, {updated} enabled, {removed} disabled, " +
+                        $"and {unchanged} unchanged.",
                         () => { });
                 }
             }
