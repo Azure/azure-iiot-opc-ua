@@ -30,8 +30,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
                     SiteId = siteId,
                     SupervisorId = supervisorId,
                     ApplicationType = type,
-                    ApplicationId = ApplicationInfoModelEx.CreateApplicationId(siteId,
-                        result.Description.Server.ApplicationUri, type),
+                    ApplicationId = ApplicationInfoModelEx.CreateApplicationId(
+                        siteId, result.Description.Server.ApplicationUri, type),
                     ProductUri = result.Description.Server.ProductUri,
                     ApplicationUri = result.Description.Server.ApplicationUri,
                     DiscoveryUrls = new HashSet<string>(result.Description.Server.DiscoveryUrls),

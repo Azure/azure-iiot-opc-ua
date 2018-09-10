@@ -34,8 +34,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Protocol {
                     SupervisorId = supervisorId,
                     ApplicationType = type,
                     HostAddresses = new HashSet<string> { hostAddress },
-                    ApplicationId = ApplicationInfoModelEx.CreateApplicationId(siteId,
-                        ep.Server.ApplicationUri, type),
+                    ApplicationId = ApplicationInfoModelEx.CreateApplicationId(
+                        siteId, ep.Server.ApplicationUri, type),
                     ApplicationUri = ep.Server.ApplicationUri,
                     DiscoveryUrls = new HashSet<string>(ep.Server.DiscoveryUrls),
                     DiscoveryProfileUri = ep.Server.DiscoveryProfileUri,

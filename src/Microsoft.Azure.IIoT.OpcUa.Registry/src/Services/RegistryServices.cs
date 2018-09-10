@@ -687,6 +687,9 @@ namespace Microsoft.Azure.IIoT.OpcUa.Registry.Services {
             if (events == null) {
                 throw new ArgumentNullException(nameof(events));
             }
+            if ((result.RegisterOnly ?? false) && !events.Any()) {
+                return;
+            }
             var sites = events.Select(e => e.Application.SiteId).Distinct();
             if (sites.Count() > 1) {
                 throw new ArgumentException("Unexpected number of sites in discovery");
