@@ -337,7 +337,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
         /// <param name="nodeId"></param>
         /// <param name="children"></param>
         /// <returns></returns>
-        private static Task<NodeModel> ReadNodeModelAsync(Session session,
+        private Task<NodeModel> ReadNodeModelAsync(Session session,
             NodeId nodeId, bool? children) {
 
             var currentNode = session.ReadNode(nodeId);
@@ -346,43 +346,67 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                 DisplayName = currentNode.DisplayName?.ToString(),
                 Description = currentNode.Description?.ToString(),
                 NodeClass = currentNode.NodeClass.ToServiceType(),
+                AccessRestrictions = currentNode.AccessRestrictions == 0 ?
+                    (uint?)null : currentNode.AccessRestrictions,
+                UserWriteMask = currentNode.UserWriteMask == 0 ?
+                    (uint?)null : currentNode.UserWriteMask,
+                WriteMask = currentNode.WriteMask == 0 ?
+                    (uint?)null : currentNode.WriteMask,
                 HasChildren = children
             };
             switch (currentNode) {
                 case VariableNode vn:
-                    model.AccessLevel = vn.AccessLevel.ToString();
-                    // model.UserAccessLevel = vn.UserAccessLevel.ToString();
-                    model.ValueRank = vn.ValueRank;
                     model.DataType = vn.DataType.AsString(session.MessageContext);
-                    // model.ArrayDimensions = vn.ArrayDimensions;
+                    model.ArrayDimensions = vn.ArrayDimensions == null ||
+                        vn.ArrayDimensions.Count == 0 ? null : vn.ArrayDimensions.ToArray();
+                    model.ValueRank = vn.ValueRank;
+                    model.AccessLevel = (vn.AccessLevelEx | vn.AccessLevel) == 0 ?
+                        (uint?)null : vn.AccessLevelEx | vn.AccessLevel;
+                    model.UserAccessLevel = vn.UserAccessLevel == 0 ?
+                        (uint?)null : vn.UserAccessLevel;
+                    model.Historizing = !vn.Historizing ?
+                        (bool?)null : true;
+                    model.MinimumSamplingInterval = (int)vn.MinimumSamplingInterval == 0 ?
+                        (double?)null : vn.MinimumSamplingInterval;
                     break;
                 case VariableTypeNode vtn:
-                    model.IsAbstract = vtn.IsAbstract;
-                    model.ValueRank = vtn.ValueRank;
                     model.DataType = vtn.DataType.AsString(session.MessageContext);
-                    // model.ArrayDimensions = vtn.ArrayDimensions;
-                    // model.DefaultValue = vtn.Value;
+                    model.ArrayDimensions = vtn.ArrayDimensions == null ||
+                        vtn.ArrayDimensions.Count == 0 ? null : vtn.ArrayDimensions.ToArray();
+                    model.ValueRank = vtn.ValueRank;
+                    model.IsAbstract = !vtn.IsAbstract ?
+                        (bool?)null : true;
+                    model.DefaultValue = _codec.Encode(vtn.Value, session.MessageContext);
                     break;
                 case ObjectTypeNode otn:
-                    model.IsAbstract = otn.IsAbstract;
+                    model.IsAbstract = !otn.IsAbstract ?
+                        (bool?)null : true;
                     break;
                 case ObjectNode on:
-                    model.EventNotifier = on.EventNotifier.ToString();
+                    model.EventNotifier = on.EventNotifier == 0 ?
+                        (byte?)null : on.EventNotifier;
                     break;
                 case DataTypeNode dtn:
-                    model.IsAbstract = dtn.IsAbstract;
+                    model.IsAbstract = !dtn.IsAbstract ?
+                        (bool?)null : true;
+                    model.DataTypeDefinition = dtn.DataTypeDefinition == null ? null :
+                        _codec.Encode(new Variant(dtn.DataTypeDefinition));
                     break;
                 case ReferenceTypeNode rtn:
-                    model.IsAbstract = rtn.IsAbstract;
-                    // model.InverseName = rtn.InverseName;
-                    // model.Symmetric = rtn.Symmetric;
+                    model.IsAbstract = !rtn.IsAbstract ?
+                        (bool?)null : true;
+                    model.InverseName = rtn.InverseName?.ToString();
+                    model.Symmetric = rtn.Symmetric;
                     break;
                 case ViewNode vn:
-                    model.EventNotifier = vn.EventNotifier.ToString();
-                    // model.ContainsNoLoops = vn.ContainsNoLoops;
+                    model.EventNotifier = vn.EventNotifier == 0 ?
+                        (byte?)null : vn.EventNotifier;
+                    model.ContainsNoLoops = vn.ContainsNoLoops;
                     break;
                 case MethodNode mn:
-                    model.Executable = mn.UserExecutable;
+                    model.Executable = mn.Executable;
+                    model.UserExecutable = !mn.Executable ?
+                        (bool?)null : mn.UserExecutable;
                     break;
             }
             return Task.FromResult(model);
@@ -397,7 +421,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
         /// <param name="continuationPoint"></param>
         /// <param name="references"></param>
         /// <returns></returns>
-        private static async Task<string> AddReferencesToBrowseResult(Session session,
+        private async Task<string> AddReferencesToBrowseResult(Session session,
             bool targetNodesOnly, List<NodeReferenceModel> result, byte[] continuationPoint,
             List<ReferenceDescription> references) {
             if (references != null) {
@@ -427,7 +451,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                         }
                         result.Add(new NodeReferenceModel {
                             BrowseName = 
-                                reference.BrowseName?.ToString() ?? string.Empty,
+                                reference.BrowseName.AsString(session.MessageContext),
                             Id =
                                 reference.ReferenceTypeId.AsString(session.MessageContext),
                             Direction = reference.IsForward ?
