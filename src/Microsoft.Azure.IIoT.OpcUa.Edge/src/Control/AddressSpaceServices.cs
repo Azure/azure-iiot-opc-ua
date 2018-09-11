@@ -404,7 +404,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                 foreach (var reference in references) {
                     try {
                         var nodeId = reference.NodeId.ToNodeId(session.NamespaceUris);
-                        if (targetNodesOnly && result.Any(r => r.Target.Id == nodeId)) {
+                        if (targetNodesOnly &&
+                            result.Any(r => r.Target.Id == nodeId.AsString(session.MessageContext))) {
                             continue;
                         }
                         // Check for children
