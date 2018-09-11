@@ -71,7 +71,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                         direction, typeId, !(request?.NoSubtypes ?? false), 0,
                         out var continuationPoint, out var references);
                     result.ContinuationToken = await AddReferencesToBrowseResult(session,
-                        result.References, continuationPoint, references);
+                        request.TargetNodesOnly ?? false, result.References, continuationPoint,
+                        references);
                 }
                 // Read root node
                 result.Node = await ReadNodeModelAsync(session, rootId,
@@ -103,7 +104,7 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                 var response = session.BrowseNext(null, request.Abort ?? false,
                     continuationPoint, out var revised, out var references);
                 result.ContinuationToken = await AddReferencesToBrowseResult(session,
-                    result.References, revised, references);
+                    request.TargetNodesOnly ?? false, result.References, revised, references);
                 return result;
             });
         }
@@ -391,17 +392,21 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
         /// Add references
         /// </summary>
         /// <param name="session"></param>
+        /// <param name="targetNodesOnly"></param>
         /// <param name="result"></param>
         /// <param name="continuationPoint"></param>
         /// <param name="references"></param>
         /// <returns></returns>
         private static async Task<string> AddReferencesToBrowseResult(Session session,
-            List<NodeReferenceModel> result, byte[] continuationPoint,
+            bool targetNodesOnly, List<NodeReferenceModel> result, byte[] continuationPoint,
             List<ReferenceDescription> references) {
             if (references != null) {
                 foreach (var reference in references) {
                     try {
                         var nodeId = reference.NodeId.ToNodeId(session.NamespaceUris);
+                        if (targetNodesOnly && result.Any(r => r.Target.Id == nodeId)) {
+                            continue;
+                        }
                         // Check for children
                         bool children;
                         try {
@@ -415,10 +420,15 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                             children = false;
                         }
                         var model = await ReadNodeModelAsync(session, nodeId, children);
+                        if (targetNodesOnly) {
+                            result.Add(new NodeReferenceModel { Target = model });
+                            continue;
+                        }
                         result.Add(new NodeReferenceModel {
-                            BrowseName = reference.BrowseName.ToString(),
-                            Id = reference.ReferenceTypeId.AsString(
-                                session.MessageContext),
+                            BrowseName = 
+                                reference.BrowseName?.ToString() ?? string.Empty,
+                            Id =
+                                reference.ReferenceTypeId.AsString(session.MessageContext),
                             Direction = reference.IsForward ?
                                 OpcUa.Models.BrowseDirection.Forward :
                                 OpcUa.Models.BrowseDirection.Backward,

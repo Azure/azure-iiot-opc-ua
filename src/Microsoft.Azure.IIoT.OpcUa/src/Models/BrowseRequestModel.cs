@@ -11,12 +11,14 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
     public class BrowseRequestModel {
 
         /// <summary>
-        /// Node to browse, or null for root.
+        /// Node to browse.
+        /// (default: ObjectRoot).
         /// </summary>
         public string NodeId { get; set; }
 
         /// <summary>
         /// Direction to browse in
+        /// (default: forward)
         /// </summary>
         public BrowseDirection? Direction { get; set; }
 
@@ -33,12 +35,24 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
         public bool? NoSubtypes { get; set; }
 
         /// <summary>
-        /// If not set, implies false
+        /// Max number of references to return. There might
+        /// be less returned as this is up to the client
+        /// restrictions.  Set to 0 to return no references
+        /// or target nodes.
+        /// (default is decided by client e.g. 60)
         /// </summary>
         public uint? MaxReferencesToReturn { get; set; }
 
         /// <summary>
-        /// Elevation
+        /// Whether to collapse all references into a set of
+        /// unique target nodes and not show reference
+        /// information.
+        /// (default is false)
+        /// </summary>
+        public bool? TargetNodesOnly { get; set; }
+
+        /// <summary>
+        /// Elevation.
         /// </summary>
         public AuthenticationModel Elevation { get; set; }
     }
