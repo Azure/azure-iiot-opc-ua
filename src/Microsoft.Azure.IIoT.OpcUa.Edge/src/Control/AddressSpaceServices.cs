@@ -433,16 +433,15 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                             continue;
                         }
                         // Check for children
-                        bool children;
+                        bool? children = null;
                         try {
-                            var response = session.Browse(null, null, nodeId, 0,
-                                Opc.Ua.BrowseDirection.Forward,
-                                ReferenceTypeIds.HierarchicalReferences, true, 1,
-                                out var tmp, out var childReferences);
+                            var response = session.Browse(null, null, nodeId, 1,
+                                Opc.Ua.BrowseDirection.Forward, ReferenceTypeIds.HierarchicalReferences,
+                                true, 0, out var tmp, out var childReferences);
                             children = childReferences.Count != 0;
                         }
-                        catch {
-                            children = false;
+                        catch (Exception ex) {
+                            _logger.Debug("Failed to obtain hasChildren information", () => ex);
                         }
                         var model = await ReadNodeModelAsync(session, nodeId, children);
                         if (targetNodesOnly) {
