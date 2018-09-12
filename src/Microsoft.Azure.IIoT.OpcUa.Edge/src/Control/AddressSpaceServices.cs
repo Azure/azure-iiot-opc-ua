@@ -58,6 +58,11 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                 if (NodeId.IsNull(typeId)) {
                     typeId = ReferenceTypeIds.HierarchicalReferences;
                 }
+                var view = request?.View == null ? null : new ViewDescription {
+                    ViewId = request.View.ViewId.ToNodeId(session.MessageContext),
+                    Timestamp = request.View.Timestamp ?? DateTime.MinValue,
+                    ViewVersion = request.View.Version ?? 0
+                };
                 var excludeReferences = request.MaxReferencesToReturn.HasValue &&
                     request.MaxReferencesToReturn.Value == 0;
                 var result = new BrowseResultModel();
@@ -66,7 +71,8 @@ namespace Microsoft.Azure.IIoT.OpcUa.Edge.Control {
                         .ToStackType();
                     // Browse and read children
                     result.References = new List<NodeReferenceModel>();
-                    var response = session.Browse(null, null, rootId,
+                    var response = session.Browse(
+                        null, ViewDescription.IsDefault(view) ? null : view, rootId,
                         request.MaxReferencesToReturn ?? 0u,
                         direction, typeId, !(request?.NoSubtypes ?? false), 0,
                         out var continuationPoint, out var references);

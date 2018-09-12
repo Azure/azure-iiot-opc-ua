@@ -23,6 +23,12 @@ namespace Microsoft.Azure.IIoT.OpcUa.Models {
         public BrowseDirection? Direction { get; set; }
 
         /// <summary>
+        /// View to browse
+        /// (default: null = new view = All nodes).
+        /// </summary>
+        public BrowseViewModel View { get; set; }
+
+        /// <summary>
         /// Reference types to browse.
         /// (default: hierarchical).
         /// </summary>
