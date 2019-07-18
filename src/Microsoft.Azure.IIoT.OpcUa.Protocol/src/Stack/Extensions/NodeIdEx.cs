@@ -10,6 +10,7 @@ namespace Opc.Ua.Extensions {
     using System.Globalization;
     using System.Linq;
     using System.Text;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Node id extensions
@@ -256,13 +257,13 @@ namespace Opc.Ua.Extensions {
         private static object ParseNodeIdUri(string value, out string nsUri, out string srvUri) {
             // Get resource uri
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) {
-
                 // Not a absolute uri, try to mitigate a potentially nonstandard namespace string
-                var identifier = value?.IndexOf('#') ?? -1;
-                if (identifier != -1){
-                    nsUri = value.Substring(0,identifier);
-                    value = value.Substring(identifier+1);
-				}
+                var sepPattern = @"(.+)#([isgb]{1}\=.*)";
+                var match = Regex.Match(value, sepPattern);
+                if (match.Success){
+                    nsUri = match.Groups[1].Value;
+                    value = match.Groups[2].Value;
+                }
                 else{
                     //	must be default namesapce
                     nsUri = Namespaces.OpcUa;
