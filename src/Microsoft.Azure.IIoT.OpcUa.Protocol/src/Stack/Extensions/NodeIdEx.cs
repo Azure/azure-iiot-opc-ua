@@ -256,8 +256,17 @@ namespace Opc.Ua.Extensions {
         private static object ParseNodeIdUri(string value, out string nsUri, out string srvUri) {
             // Get resource uri
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) {
-                // Not a absolute uri, must be default namesapce
-                nsUri = Namespaces.OpcUa;
+                
+				// Not a absolute uri, try to mitigate a potentially nonstandard namespace string
+                var identifier = value?.IndexOf('#') ?? -1;
+                if (identifier != -1){
+                    nsUri = value.Substring(0,identifier);
+                    value = value.Substring(identifier+1);
+				}
+                else{
+                    //	must be default namesapce
+                    nsUri = Namespaces.OpcUa;
+                }
             }
             else {
                 if (string.IsNullOrEmpty(uri.Fragment)) {
